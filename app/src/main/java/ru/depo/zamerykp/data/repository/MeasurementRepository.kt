@@ -109,6 +109,10 @@ class MeasurementRepository(
         measurementDao.deleteWheelPairSides(sessionId, wheelPairNumber)
     }
 
+    suspend fun cleanupImportedLocomotives() {
+        locomotiveDao.deleteOrphanImportedLocomotives()
+    }
+
     suspend fun finishSession(id: String) {
         measurementDao.updateStatus(id, MeasurementStatus.FINISHED, System.currentTimeMillis())
     }
@@ -151,6 +155,7 @@ class MeasurementRepository(
         importWheelPairs: Boolean,
         importArchive: Boolean,
         archivePayload: Boolean = false,
+        allowedArchiveLocomotives: Set<String>? = null,
     ): String {
         val locomotive = if (archivePayload) {
             ensureArchiveLocomotive(
@@ -158,6 +163,7 @@ class MeasurementRepository(
                 number = dto.locomotive.number,
                 wheelPairCount = dto.locomotive.wheelPairCount,
                 comment = dto.locomotive.comment,
+                allowedArchiveLocomotives = allowedArchiveLocomotives,
             )
         } else {
             ensureImportedLocomotive(
@@ -310,10 +316,16 @@ class MeasurementRepository(
         number: String,
         wheelPairCount: Int,
         comment: String,
+        allowedArchiveLocomotives: Set<String>? = null,
     ): ru.depo.zamerykp.data.db.LocomotiveEntity? {
         val now = System.currentTimeMillis()
         val normalizedSeries = series.normalizeSeries()
         val normalizedNumber = number.normalizeNumber()
+        val key = archiveLocomotiveKey(normalizedSeries, normalizedNumber)
+        if (allowedArchiveLocomotives != null && key !in allowedArchiveLocomotives) {
+            return locomotiveDao.find(normalizedSeries, normalizedNumber)
+                ?: locomotiveDao.findByNumber(normalizedNumber)
+        }
         val existing = locomotiveDao.find(normalizedSeries, normalizedNumber)
             ?: locomotiveDao.findByNumber(normalizedNumber)
         val entity = ru.depo.zamerykp.data.db.LocomotiveEntity(
@@ -395,6 +407,9 @@ class MeasurementRepository(
 private fun String.normalizeSeries(): String = trim().uppercase()
 
 private fun String.normalizeNumber(): String = trim()
+
+private fun archiveLocomotiveKey(series: String, number: String): String =
+    "${series.trim().uppercase()}|${number.trim()}"
 
 private fun SideExportDto.toEntity(
     sessionId: String,

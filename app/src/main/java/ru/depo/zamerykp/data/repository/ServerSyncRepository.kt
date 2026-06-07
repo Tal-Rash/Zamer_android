@@ -112,7 +112,12 @@ class ServerSyncRepository(
             pendingPushed += 1
         }
 
-        val pulledArchive = pullArchiveData(baseUrl, cookie)
+        val pulledArchive = pullArchiveData(
+            baseUrl,
+            cookie,
+            serverReference.locomotives.map { it.referenceKey() }.toSet(),
+        )
+        measurementRepository.cleanupImportedLocomotives()
 
         ServerSyncResult(
             referencePushed = 0,
@@ -176,7 +181,11 @@ class ServerSyncRepository(
         }
     }
 
-    private suspend fun pullArchiveData(baseUrl: String, cookie: String): Int {
+    private suspend fun pullArchiveData(
+        baseUrl: String,
+        cookie: String,
+        allowedReferenceLocomotives: Set<String>,
+    ): Int {
         val text = getText("$baseUrl/zamer-kp/api/phone-export?kind=archive&format=json", cookie)
         val payload = exportRepository.parseImportPayload(text)
         return when (payload) {
@@ -190,6 +199,7 @@ class ServerSyncRepository(
                         importWheelPairs = true,
                         importArchive = true,
                         archivePayload = true,
+                        allowedArchiveLocomotives = allowedReferenceLocomotives,
                     )
                     imported += 1
                 }
