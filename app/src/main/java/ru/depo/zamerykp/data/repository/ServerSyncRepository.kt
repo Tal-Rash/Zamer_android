@@ -72,6 +72,20 @@ class ServerSyncRepository(
             }
             val equal = serverLocomotive.referenceEquals(localLocomotive)
             when {
+                serverLocomotive.deletedAt > 0L && localLocomotive.deletedAt <= 0L && serverLocomotive.updatedAt >= localLocomotive.updatedAt -> {
+                    measurementRepository.importReferenceData(
+                        ReferenceDataExportDto(
+                            exportedAt = serverReference.exportedAt,
+                            locomotives = listOf(serverLocomotive),
+                        ),
+                        importLocomotives = true,
+                        importWheelPairs = true,
+                    )
+                    referencePulled += 1
+                }
+                localLocomotive.deletedAt > 0L && serverLocomotive.deletedAt <= 0L && localLocomotive.updatedAt >= serverLocomotive.updatedAt -> {
+                    referenceToUpload += localLocomotive
+                }
                 serverLocomotive.updatedAt > localLocomotive.updatedAt -> {
                     measurementRepository.importReferenceData(
                         ReferenceDataExportDto(

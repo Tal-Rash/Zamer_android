@@ -163,6 +163,7 @@ class MeasurementRepository(
                 number = dto.locomotive.number,
                 wheelPairCount = dto.locomotive.wheelPairCount,
                 comment = dto.locomotive.comment,
+                deletedAt = dto.locomotive.deletedAt,
                 allowedArchiveLocomotives = allowedArchiveLocomotives,
             )
         } else {
@@ -321,6 +322,7 @@ class MeasurementRepository(
         number: String,
         wheelPairCount: Int,
         comment: String,
+        deletedAt: Long,
         allowedArchiveLocomotives: Set<String>? = null,
     ): ru.depo.zamerykp.data.db.LocomotiveEntity? {
         val now = System.currentTimeMillis()
@@ -342,7 +344,7 @@ class MeasurementRepository(
             createdOnPhone = existing?.createdOnPhone ?: false,
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
-            deletedAt = existing?.deletedAt ?: 0L,
+            deletedAt = maxOf(existing?.deletedAt ?: 0L, deletedAt),
         )
         if (existing == null) {
             locomotiveDao.upsert(entity)
