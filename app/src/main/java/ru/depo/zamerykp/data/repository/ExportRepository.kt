@@ -103,6 +103,7 @@ class ExportRepository(
                     series = locomotive.series,
                     number = locomotive.number,
                     wheelPairCount = locomotive.wheelPairCount,
+                    updatedAt = locomotive.updatedAt,
                     wheelPairs = wheelPairs,
                 )
             },

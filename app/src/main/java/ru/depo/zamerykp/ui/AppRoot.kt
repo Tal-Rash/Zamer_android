@@ -2394,6 +2394,36 @@ private fun SyncScreen(
         }
     }
 
+    if (state.syncConflictSummary.isNotBlank()) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Найдены конфликты") },
+            text = {
+                Text(
+                    "На сервере и в телефоне есть разные версии локомотивов.\n\n${state.syncConflictSummary}"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.pushLocalReferenceToServer(syncServerUrlText.trim(), syncPasswordText)
+                    }
+                ) {
+                    Text("Отправить локальные")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearSyncConflictSummary()
+                    }
+                ) {
+                    Text("Оставить сервер")
+                }
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()

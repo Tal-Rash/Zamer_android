@@ -27,7 +27,9 @@ import ru.depo.zamerykp.domain.VoiceParseResult
 import ru.depo.zamerykp.domain.WheelSide
 import ru.depo.zamerykp.domain.suggestedFileName
 import ru.depo.zamerykp.data.repository.ServerSyncRepository
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.math.roundToInt
 
 enum class ImportPayloadKind {
@@ -97,6 +99,7 @@ data class MeasurementUiState(
     val backupShareRequestNonce: Long = 0L,
     val backupStatusMessage: String = "",
     val syncStatusMessage: String = "",
+    val syncConflictSummary: String = "",
     val importCheckMessage: String = "",
     val importUi: ImportUiState = ImportUiState(),
     val voiceFlowState: VoiceFlowState = VoiceFlowState.IDLE,
@@ -822,13 +825,51 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                         append("Отправлено: черновики ${result.pendingPushed}. ")
                         append("Получено: справочник ${result.referencePulled}, архив ${result.archivePulled}.")
                     }
+                        .plus(
+                            if (result.referenceConflicts.isNotEmpty()) {
+                                "\nЕсть конфликты справочника: ${result.referenceConflicts.size}. " +
+                                    "Можно отправить локальные изменения на сервер или оставить серверную версию."
+                            } else {
+                                ""
+                            }
+                        ),
+                    syncConflictSummary = if (result.referenceConflicts.isNotEmpty()) {
+                        result.referenceConflicts.joinToString(separator = "\n") { conflict ->
+                            "${conflict.series} ${conflict.number}: ${conflict.reason} " +
+                                "(локально ${conflict.localUpdatedAt.toSyncTime()}, сервер ${conflict.serverUpdatedAt.toSyncTime()})"
+                        }
+                    } else {
+                        ""
+                    }
                 )
             } catch (error: Exception) {
                 sessionState.value = sessionState.value.copy(
-                    syncStatusMessage = "Ошибка синхронизации: ${error.message ?: error}"
+                    syncStatusMessage = "Ошибка синхронизации: ${error.message ?: error}",
+                    syncConflictSummary = ""
                 )
             }
         }
+    }
+
+    fun pushLocalReferenceToServer(serverBaseUrl: String, password: String) {
+        viewModelScope.launch {
+            sessionState.value = sessionState.value.copy(syncStatusMessage = "Отправка локального справочника...")
+            try {
+                val count = container.serverSyncRepository.pushLocalReferenceSnapshot(serverBaseUrl, password)
+                sessionState.value = sessionState.value.copy(
+                    syncStatusMessage = "Локальный справочник отправлен на сервер: ${count} локомотивов.",
+                    syncConflictSummary = ""
+                )
+            } catch (error: Exception) {
+                sessionState.value = sessionState.value.copy(
+                    syncStatusMessage = "Ошибка отправки справочника: ${error.message ?: error}"
+                )
+            }
+        }
+    }
+
+    fun clearSyncConflictSummary() {
+        sessionState.value = sessionState.value.copy(syncConflictSummary = "")
     }
 
     fun requestFullBackupShare() {
@@ -1075,6 +1116,16 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         )
     }
 }
+
+private fun Long.toSyncTime(): String =
+    if (this <= 0L) {
+        "нет"
+    } else {
+        Instant.ofEpochMilli(this)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDateTime()
+            .toString()
+    }
 
 class AppViewModelFactory(private val container: AppContainer) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")

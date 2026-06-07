@@ -5,6 +5,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ru.depo.zamerykp.domain.ImportPayload
+import ru.depo.zamerykp.domain.ReferenceDataExportDto
+import ru.depo.zamerykp.domain.ReferenceLocomotiveExportDto
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -16,6 +18,15 @@ data class ServerSyncResult(
     val pendingPushed: Int = 0,
     val referencePulled: Int = 0,
     val archivePulled: Int = 0,
+    val referenceConflicts: List<ReferenceSyncConflict> = emptyList(),
+)
+
+data class ReferenceSyncConflict(
+    val series: String,
+    val number: String,
+    val localUpdatedAt: Long,
+    val serverUpdatedAt: Long,
+    val reason: String,
 )
 
 class ServerSyncRepository(
@@ -36,6 +47,63 @@ class ServerSyncRepository(
         require(password.isNotBlank()) { "Введите пароль веб-входа." }
 
         val cookie = login(baseUrl, password)
+        val serverReference = pullReferenceDto(baseUrl, cookie)
+        val localReference = exportRepository.buildReferenceExport()
+        val localMap = localReference.locomotives.associateBy { it.referenceKey() }
+        val serverMap = serverReference.locomotives.associateBy { it.referenceKey() }
+
+        val referenceConflicts = mutableListOf<ReferenceSyncConflict>()
+        var referencePulled = 0
+        for (serverLocomotive in serverReference.locomotives) {
+            val key = serverLocomotive.referenceKey()
+            val localLocomotive = localMap[key]
+            if (localLocomotive == null) {
+                measurementRepository.importReferenceData(
+                    ReferenceDataExportDto(
+                        exportedAt = serverReference.exportedAt,
+                        locomotives = listOf(serverLocomotive),
+                    ),
+                    importLocomotives = true,
+                    importWheelPairs = true,
+                )
+                referencePulled += 1
+                continue
+            }
+            val equal = serverLocomotive.referenceEquals(localLocomotive)
+            when {
+                serverLocomotive.updatedAt > localLocomotive.updatedAt -> {
+                    measurementRepository.importReferenceData(
+                        ReferenceDataExportDto(
+                            exportedAt = serverReference.exportedAt,
+                            locomotives = listOf(serverLocomotive),
+                        ),
+                        importLocomotives = true,
+                        importWheelPairs = true,
+                    )
+                    referencePulled += 1
+                }
+                !equal -> {
+                    referenceConflicts += ReferenceSyncConflict(
+                        series = serverLocomotive.series,
+                        number = serverLocomotive.number,
+                        localUpdatedAt = localLocomotive.updatedAt,
+                        serverUpdatedAt = serverLocomotive.updatedAt,
+                        reason = "Изменения есть и на сервере, и локально.",
+                    )
+                }
+            }
+        }
+        for (localLocomotive in localReference.locomotives) {
+            if (serverMap[localLocomotive.referenceKey()] == null) {
+                referenceConflicts += ReferenceSyncConflict(
+                    series = localLocomotive.series,
+                    number = localLocomotive.number,
+                    localUpdatedAt = localLocomotive.updatedAt,
+                    serverUpdatedAt = 0L,
+                    reason = "Локомотив есть только локально.",
+                )
+            }
+        }
         val pending = measurementRepository.getPendingMeasurements()
         var pendingPushed = 0
         for (item in pending) {
@@ -44,16 +112,30 @@ class ServerSyncRepository(
             pendingPushed += 1
         }
 
-        val pulledReference = pullReferenceData(baseUrl, cookie)
         val pulledArchive = pullArchiveData(baseUrl, cookie)
 
         ServerSyncResult(
             referencePushed = 0,
             archivePushed = 0,
             pendingPushed = pendingPushed,
-            referencePulled = pulledReference,
+            referencePulled = referencePulled,
             archivePulled = pulledArchive,
+            referenceConflicts = referenceConflicts,
         )
+    }
+
+    suspend fun pushLocalReferenceSnapshot(
+        serverBaseUrl: String,
+        password: String,
+    ): Int = withContext(Dispatchers.IO) {
+        val baseUrl = normalizeBaseUrl(serverBaseUrl)
+        require(baseUrl.isNotBlank()) { "Введите адрес сервера." }
+        require(password.isNotBlank()) { "Введите пароль веб-входа." }
+        val cookie = login(baseUrl, password)
+        val referenceDto = exportRepository.buildReferenceExport()
+        if (referenceDto.locomotives.isEmpty()) return@withContext 0
+        postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(referenceDto))
+        referenceDto.locomotives.size
     }
 
     private fun normalizeBaseUrl(value: String): String =
@@ -85,14 +167,12 @@ class ServerSyncRepository(
         return cookie
     }
 
-    private suspend fun pullReferenceData(baseUrl: String, cookie: String): Int {
+    private suspend fun pullReferenceDto(baseUrl: String, cookie: String): ReferenceDataExportDto {
         val text = getText("$baseUrl/zamer-kp/api/phone-export?kind=reference&format=json", cookie)
         val payload = exportRepository.parseImportPayload(text)
         return when (payload) {
-            is ImportPayload.ReferenceData -> {
-                measurementRepository.importReferenceData(payload.dto, importLocomotives = true, importWheelPairs = true)
-            }
-            is ImportPayload.Measurement, is ImportPayload.ArchiveData -> 0
+            is ImportPayload.ReferenceData -> payload.dto
+            is ImportPayload.Measurement, is ImportPayload.ArchiveData -> throw IllegalStateException("Сервер вернул не справочник.")
         }
     }
 
@@ -158,5 +238,21 @@ class ServerSyncRepository(
             throw IllegalStateException(text.ifBlank { "Сервер вернул код $code" })
         }
         return text
+    }
+}
+
+private fun ReferenceLocomotiveExportDto.referenceKey(): String =
+    "${series.trim().uppercase()}|${number.trim()}"
+
+private fun ReferenceLocomotiveExportDto.referenceEquals(other: ReferenceLocomotiveExportDto): Boolean {
+    if (series.trim().uppercase() != other.series.trim().uppercase()) return false
+    if (number.trim() != other.number.trim()) return false
+    if (wheelPairCount != other.wheelPairCount) return false
+    if (wheelPairs.size != other.wheelPairs.size) return false
+    return wheelPairs.zip(other.wheelPairs).all { (left, right) ->
+        left.number == right.number &&
+            left.axisNumber == right.axisNumber &&
+            left.diameterLeft == right.diameterLeft &&
+            left.diameterRight == right.diameterRight
     }
 }

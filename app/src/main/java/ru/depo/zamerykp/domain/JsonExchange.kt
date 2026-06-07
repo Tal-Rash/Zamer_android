@@ -73,6 +73,7 @@ data class ReferenceLocomotiveExportDto(
     val series: String,
     val number: String,
     val wheelPairCount: Int,
+    val updatedAt: Long = 0L,
     val wheelPairs: List<ReferenceWheelPairExportDto> = emptyList(),
 )
 

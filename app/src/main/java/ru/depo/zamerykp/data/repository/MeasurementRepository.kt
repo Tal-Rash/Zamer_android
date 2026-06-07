@@ -165,6 +165,7 @@ class MeasurementRepository(
                 number = dto.locomotive.number,
                 wheelPairCount = dto.locomotive.wheelPairCount,
                 comment = dto.locomotive.comment,
+                updatedAt = System.currentTimeMillis(),
                 createdOnPhone = dto.locomotive.isNew,
                 createIfMissing = importLocomotive || importArchive,
             )
@@ -228,6 +229,7 @@ class MeasurementRepository(
             number = dto.number,
             wheelPairCount = dto.wheelPairCount,
             comment = "",
+            updatedAt = dto.updatedAt,
             createdOnPhone = false,
             createIfMissing = importLocomotives || importWheelPairs || locomotiveDao.find(dto.series.normalizeSeries(), dto.number.normalizeNumber()) != null || locomotiveDao.findByNumber(dto.number.normalizeNumber()) != null,
         ) ?: return
@@ -260,6 +262,7 @@ class MeasurementRepository(
         number: String,
         wheelPairCount: Int,
         comment: String,
+        updatedAt: Long,
         createdOnPhone: Boolean,
         createIfMissing: Boolean,
     ): ru.depo.zamerykp.data.db.LocomotiveEntity? {
@@ -277,7 +280,7 @@ class MeasurementRepository(
             comment = if (comment.isBlank()) existing?.comment.orEmpty() else comment.trim(),
             createdOnPhone = existing?.createdOnPhone ?: createdOnPhone,
             createdAt = existing?.createdAt ?: now,
-            updatedAt = now,
+            updatedAt = if (updatedAt > 0L) maxOf(existing?.updatedAt ?: 0L, updatedAt) else now,
         )
         if (existing == null) {
             locomotiveDao.upsert(entity)
