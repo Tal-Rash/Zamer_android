@@ -280,6 +280,7 @@ private fun ReferenceLocomotiveExportDto.referenceEquals(other: ReferenceLocomot
     if (number.trim() != other.number.trim()) return false
     if (wheelPairCount != other.wheelPairCount) return false
     if (deletedAt != other.deletedAt) return false
+    if (deletedAt > 0L && other.deletedAt > 0L) return true
     if (wheelPairs.size != other.wheelPairs.size) return false
     return wheelPairs.zip(other.wheelPairs).all { (left, right) ->
         left.number == right.number &&
