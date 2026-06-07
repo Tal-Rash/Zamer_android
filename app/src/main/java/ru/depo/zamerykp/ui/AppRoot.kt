@@ -2373,6 +2373,20 @@ private fun SyncScreen(
     val settings by viewModel.settings.collectAsState()
     val pendingMeasurements by viewModel.pendingMeasurements.collectAsState()
     val hasDrafts = pendingMeasurements.isNotEmpty()
+    var syncServerUrlText by rememberSaveable { mutableStateOf(settings.syncServerUrl) }
+    var syncPasswordText by rememberSaveable { mutableStateOf(settings.syncPassword) }
+    var syncServerUrlTouched by rememberSaveable { mutableStateOf(false) }
+    var syncPasswordTouched by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(settings.syncServerUrl) {
+        if (!syncServerUrlTouched && syncServerUrlText.isBlank() && settings.syncServerUrl.isNotBlank()) {
+            syncServerUrlText = settings.syncServerUrl
+        }
+    }
+    LaunchedEffect(settings.syncPassword) {
+        if (!syncPasswordTouched && syncPasswordText.isBlank() && settings.syncPassword.isNotBlank()) {
+            syncPasswordText = settings.syncPassword
+        }
+    }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val text = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
@@ -2417,22 +2431,30 @@ private fun SyncScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         BigTextField(
-                            value = settings.syncServerUrl,
-                            onValueChange = viewModel::updateSyncServerUrl,
+                            value = syncServerUrlText,
+                            onValueChange = {
+                                syncServerUrlTouched = true
+                                syncServerUrlText = it
+                                viewModel.updateSyncServerUrl(it)
+                            },
                             label = "Адрес сервера",
                             keyboardType = KeyboardType.Uri
                         )
                         BigTextField(
-                            value = settings.syncPassword,
-                            onValueChange = viewModel::updateSyncPassword,
+                            value = syncPasswordText,
+                            onValueChange = {
+                                syncPasswordTouched = true
+                                syncPasswordText = it
+                                viewModel.updateSyncPassword(it)
+                            },
                             label = "Пароль веб-входа",
                             keyboardType = KeyboardType.Password,
                             visualTransformation = PasswordVisualTransformation()
                         )
                         Button(
                             modifier = Modifier.fillMaxWidth().height(52.dp),
-                            onClick = viewModel::syncWithServer,
-                            enabled = settings.syncServerUrl.isNotBlank() && settings.syncPassword.isNotBlank(),
+                            onClick = { viewModel.syncWithServer(syncServerUrlText.trim(), syncPasswordText) },
+                            enabled = syncServerUrlText.isNotBlank() && syncPasswordText.isNotBlank(),
                             shape = MaterialTheme.shapes.medium
                         ) {
                             Text("Синхронизировать")

@@ -25,7 +25,7 @@ class SettingsRepository(private val settingsDao: SettingsDao) {
 
     suspend fun updateSyncServerUrl(url: String) {
         val current = settingsDao.get() ?: AppSettingsEntity()
-        settingsDao.upsert(current.copy(syncServerUrl = url.trim()))
+        settingsDao.upsert(current.copy(syncServerUrl = url))
     }
 
     suspend fun updateSyncPassword(password: String) {

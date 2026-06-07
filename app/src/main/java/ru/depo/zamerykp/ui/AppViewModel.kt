@@ -808,14 +808,13 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    fun syncWithServer() {
+    fun syncWithServer(serverBaseUrl: String, password: String) {
         viewModelScope.launch {
-            val syncSettings = settings.value
             sessionState.value = sessionState.value.copy(syncStatusMessage = "Синхронизация...")
             try {
                 val result = container.serverSyncRepository.sync(
-                    serverBaseUrl = syncSettings.syncServerUrl,
-                    password = syncSettings.syncPassword,
+                    serverBaseUrl = serverBaseUrl,
+                    password = password,
                 )
                 sessionState.value = sessionState.value.copy(
                     syncStatusMessage = buildString {
