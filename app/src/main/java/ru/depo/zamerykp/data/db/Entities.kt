@@ -23,6 +23,7 @@ data class LocomotiveEntity(
     val createdOnPhone: Boolean = true,
     val createdAt: Long,
     val updatedAt: Long,
+    val deletedAt: Long = 0L,
 )
 
 @Entity(

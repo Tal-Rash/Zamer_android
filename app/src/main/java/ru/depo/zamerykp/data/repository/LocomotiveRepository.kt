@@ -43,6 +43,7 @@ class LocomotiveRepository(
                 createdOnPhone = old?.createdOnPhone ?: createdOnPhone,
                 createdAt = old?.createdAt ?: now,
                 updatedAt = now,
+                deletedAt = 0L,
             )
         )
         val locomotiveId = if (savedId == -1L || savedId == 0L) (old?.id ?: id) else savedId
@@ -51,7 +52,7 @@ class LocomotiveRepository(
     }
 
     suspend fun deleteLocomotive(id: Long) {
-        locomotiveDao.delete(id)
+        locomotiveDao.delete(id, System.currentTimeMillis(), System.currentTimeMillis())
     }
 
     suspend fun saveProfiles(locomotiveId: Long, profiles: List<WheelPairProfileEntity>) {

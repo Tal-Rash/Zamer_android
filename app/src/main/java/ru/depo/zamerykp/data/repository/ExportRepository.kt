@@ -8,6 +8,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
@@ -60,6 +61,7 @@ class ExportRepository(
                 wheelPairCount = locomotive.wheelPairCount,
                 comment = locomotive.comment,
                 isNew = locomotive.createdOnPhone,
+                deletedAt = locomotive.deletedAt,
             ),
             repairType = session.repairType,
             measurementDate = session.measurementDate,
@@ -104,6 +106,7 @@ class ExportRepository(
                     number = locomotive.number,
                     wheelPairCount = locomotive.wheelPairCount,
                     updatedAt = locomotive.updatedAt,
+                    deletedAt = locomotive.deletedAt,
                     wheelPairs = wheelPairs,
                 )
             },
@@ -196,6 +199,7 @@ class ExportRepository(
                 wheelPairCount = locomotive["wheelPairCount"]?.jsonPrimitive?.intOrNull ?: wheelPairs.size,
                 comment = locomotive["comment"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                 isNew = locomotive["isNew"]?.jsonPrimitive?.booleanOrNull ?: false,
+                deletedAt = locomotive["deletedAt"]?.jsonPrimitive?.longOrNull ?: 0L,
             ),
             repairType = obj["repairType"]?.jsonPrimitive?.contentOrNull.orEmpty(),
             measurementDate = obj["measurementDate"]?.jsonPrimitive?.contentOrNull.orEmpty(),

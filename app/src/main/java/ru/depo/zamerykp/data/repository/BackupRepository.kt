@@ -72,6 +72,7 @@ private fun LocomotiveEntity.toDto() = BackupLocomotiveDto(
     createdOnPhone = createdOnPhone,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    deletedAt = deletedAt,
 )
 
 private fun WheelPairProfileEntity.toDto() = BackupWheelPairProfileDto(
@@ -123,6 +124,7 @@ private fun BackupLocomotiveDto.toEntity() = LocomotiveEntity(
     createdOnPhone = createdOnPhone,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    deletedAt = deletedAt,
 )
 
 private fun BackupWheelPairProfileDto.toEntity() = WheelPairProfileEntity(

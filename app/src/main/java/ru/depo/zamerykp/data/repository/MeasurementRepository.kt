@@ -172,6 +172,7 @@ class MeasurementRepository(
                 wheelPairCount = dto.locomotive.wheelPairCount,
                 comment = dto.locomotive.comment,
                 updatedAt = System.currentTimeMillis(),
+                deletedAt = dto.locomotive.deletedAt,
                 createdOnPhone = dto.locomotive.isNew,
                 createIfMissing = importLocomotive || importArchive,
             )
@@ -236,8 +237,9 @@ class MeasurementRepository(
             wheelPairCount = dto.wheelPairCount,
             comment = "",
             updatedAt = dto.updatedAt,
+            deletedAt = dto.deletedAt,
             createdOnPhone = false,
-            createIfMissing = importLocomotives || importWheelPairs || locomotiveDao.find(dto.series.normalizeSeries(), dto.number.normalizeNumber()) != null || locomotiveDao.findByNumber(dto.number.normalizeNumber()) != null,
+            createIfMissing = dto.deletedAt > 0L || importLocomotives || importWheelPairs || locomotiveDao.find(dto.series.normalizeSeries(), dto.number.normalizeNumber()) != null || locomotiveDao.findByNumber(dto.number.normalizeNumber()) != null,
         ) ?: return
         if (!importWheelPairs) {
             if (importLocomotives) {
@@ -269,6 +271,7 @@ class MeasurementRepository(
         wheelPairCount: Int,
         comment: String,
         updatedAt: Long,
+        deletedAt: Long,
         createdOnPhone: Boolean,
         createIfMissing: Boolean,
     ): ru.depo.zamerykp.data.db.LocomotiveEntity? {
@@ -287,6 +290,7 @@ class MeasurementRepository(
             createdOnPhone = existing?.createdOnPhone ?: createdOnPhone,
             createdAt = existing?.createdAt ?: now,
             updatedAt = if (updatedAt > 0L) maxOf(existing?.updatedAt ?: 0L, updatedAt) else now,
+            deletedAt = deletedAt,
         )
         if (existing == null) {
             locomotiveDao.upsert(entity)
@@ -300,6 +304,7 @@ class MeasurementRepository(
                 createdOnPhone = entity.createdOnPhone,
                 createdAt = entity.createdAt,
                 updatedAt = entity.updatedAt,
+                deletedAt = entity.deletedAt,
             )
         }
         val savedId = existing?.id ?: 0L
@@ -337,6 +342,7 @@ class MeasurementRepository(
             createdOnPhone = existing?.createdOnPhone ?: false,
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
+            deletedAt = existing?.deletedAt ?: 0L,
         )
         if (existing == null) {
             locomotiveDao.upsert(entity)
@@ -350,6 +356,7 @@ class MeasurementRepository(
                 createdOnPhone = entity.createdOnPhone,
                 createdAt = entity.createdAt,
                 updatedAt = entity.updatedAt,
+                deletedAt = entity.deletedAt,
             )
         }
         val savedId = existing?.id ?: 0L

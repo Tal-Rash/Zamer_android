@@ -53,6 +53,7 @@ class ServerSyncRepository(
         val serverMap = serverReference.locomotives.associateBy { it.referenceKey() }
 
         val referenceConflicts = mutableListOf<ReferenceSyncConflict>()
+        val referenceToUpload = mutableListOf<ReferenceLocomotiveExportDto>()
         var referencePulled = 0
         for (serverLocomotive in serverReference.locomotives) {
             val key = serverLocomotive.referenceKey()
@@ -82,6 +83,9 @@ class ServerSyncRepository(
                     )
                     referencePulled += 1
                 }
+                localLocomotive.updatedAt > serverLocomotive.updatedAt -> {
+                    referenceToUpload += localLocomotive
+                }
                 !equal -> {
                     referenceConflicts += ReferenceSyncConflict(
                         series = serverLocomotive.series,
@@ -95,14 +99,18 @@ class ServerSyncRepository(
         }
         for (localLocomotive in localReference.locomotives) {
             if (serverMap[localLocomotive.referenceKey()] == null) {
-                referenceConflicts += ReferenceSyncConflict(
-                    series = localLocomotive.series,
-                    number = localLocomotive.number,
-                    localUpdatedAt = localLocomotive.updatedAt,
-                    serverUpdatedAt = 0L,
-                    reason = "Локомотив есть только локально.",
-                )
+                referenceToUpload += localLocomotive
             }
+        }
+        val referencePushed = if (referenceToUpload.isNotEmpty()) {
+            val payload = localReference.copy(
+                exportedAt = serverReference.exportedAt,
+                locomotives = referenceToUpload.distinctBy { it.referenceKey() },
+            )
+            postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(payload))
+            payload.locomotives.size
+        } else {
+            0
         }
         val pending = measurementRepository.getPendingMeasurements()
         var pendingPushed = 0
@@ -117,10 +125,9 @@ class ServerSyncRepository(
             cookie,
             serverReference.locomotives.map { it.referenceKey() }.toSet(),
         )
-        measurementRepository.cleanupImportedLocomotives()
 
         ServerSyncResult(
-            referencePushed = 0,
+            referencePushed = referencePushed,
             archivePushed = 0,
             pendingPushed = pendingPushed,
             referencePulled = referencePulled,
@@ -258,6 +265,7 @@ private fun ReferenceLocomotiveExportDto.referenceEquals(other: ReferenceLocomot
     if (series.trim().uppercase() != other.series.trim().uppercase()) return false
     if (number.trim() != other.number.trim()) return false
     if (wheelPairCount != other.wheelPairCount) return false
+    if (deletedAt != other.deletedAt) return false
     if (wheelPairs.size != other.wheelPairs.size) return false
     return wheelPairs.zip(other.wheelPairs).all { (left, right) ->
         left.number == right.number &&

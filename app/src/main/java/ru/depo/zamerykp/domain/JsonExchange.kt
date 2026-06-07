@@ -66,6 +66,7 @@ data class LocomotiveExportDto(
     val wheelPairCount: Int,
     val comment: String = "",
     val isNew: Boolean = false,
+    val deletedAt: Long = 0L,
 )
 
 @Serializable
@@ -74,6 +75,7 @@ data class ReferenceLocomotiveExportDto(
     val number: String,
     val wheelPairCount: Int,
     val updatedAt: Long = 0L,
+    val deletedAt: Long = 0L,
     val wheelPairs: List<ReferenceWheelPairExportDto> = emptyList(),
 )
 
@@ -111,6 +113,7 @@ data class BackupLocomotiveDto(
     val createdOnPhone: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    val deletedAt: Long = 0L,
 )
 
 @Serializable

@@ -11,12 +11,12 @@ import ru.depo.zamerykp.domain.MeasurementStatus
 import ru.depo.zamerykp.domain.SentStatus
 import ru.depo.zamerykp.domain.WheelSide
 
-@Dao
-interface LocomotiveDao {
+    @Dao
+    interface LocomotiveDao {
     @Query("SELECT * FROM locomotives ORDER BY id")
     suspend fun getAll(): List<LocomotiveEntity>
 
-    @Query("SELECT * FROM locomotives ORDER BY series, number")
+    @Query("SELECT * FROM locomotives WHERE deletedAt = 0 ORDER BY series, number")
     fun observeAll(): Flow<List<LocomotiveEntity>>
 
     @Query("SELECT * FROM locomotives WHERE id = :id")
@@ -40,7 +40,8 @@ interface LocomotiveDao {
             comment = :comment,
             createdOnPhone = :createdOnPhone,
             createdAt = :createdAt,
-            updatedAt = :updatedAt
+            updatedAt = :updatedAt,
+            deletedAt = :deletedAt
         WHERE id = :id
         """
     )
@@ -53,10 +54,18 @@ interface LocomotiveDao {
         createdOnPhone: Boolean,
         createdAt: Long,
         updatedAt: Long,
+        deletedAt: Long,
     )
 
-    @Query("DELETE FROM locomotives WHERE id = :id")
-    suspend fun delete(id: Long)
+    @Query(
+        """
+        UPDATE locomotives
+        SET deletedAt = :deletedAt,
+            updatedAt = :updatedAt
+        WHERE id = :id
+        """
+    )
+    suspend fun delete(id: Long, deletedAt: Long, updatedAt: Long)
 
     @Query(
         """
