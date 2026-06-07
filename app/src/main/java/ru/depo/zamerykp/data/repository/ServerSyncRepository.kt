@@ -36,22 +36,6 @@ class ServerSyncRepository(
         require(password.isNotBlank()) { "Введите пароль веб-входа." }
 
         val cookie = login(baseUrl, password)
-        val referenceDto = exportRepository.buildReferenceExport()
-        val referencePushed = if (referenceDto.locomotives.isNotEmpty()) {
-            postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(referenceDto))
-            referenceDto.locomotives.size
-        } else {
-            0
-        }
-
-        val archiveDto = exportRepository.buildArchiveExport()
-        val archivePushed = if (archiveDto.archive.isNotEmpty()) {
-            postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(archiveDto))
-            archiveDto.archive.size
-        } else {
-            0
-        }
-
         val pending = measurementRepository.getPendingMeasurements()
         var pendingPushed = 0
         for (item in pending) {
@@ -64,8 +48,8 @@ class ServerSyncRepository(
         val pulledArchive = pullArchiveData(baseUrl, cookie)
 
         ServerSyncResult(
-            referencePushed = referencePushed,
-            archivePushed = archivePushed,
+            referencePushed = 0,
+            archivePushed = 0,
             pendingPushed = pendingPushed,
             referencePulled = pulledReference,
             archivePulled = pulledArchive,
