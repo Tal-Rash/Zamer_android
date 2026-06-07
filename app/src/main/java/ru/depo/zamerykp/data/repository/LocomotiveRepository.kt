@@ -33,6 +33,7 @@ class LocomotiveRepository(
         } else {
             locomotiveDao.find(normalizedSeries, normalizedNumber) ?: locomotiveDao.findByNumber(normalizedNumber)
         }
+        val sortOrder = old?.sortOrder ?: (locomotiveDao.getMaxSortOrder() + 1)
         val savedId = locomotiveDao.upsert(
             LocomotiveEntity(
                 id = old?.id ?: id,
@@ -44,6 +45,7 @@ class LocomotiveRepository(
                 createdAt = old?.createdAt ?: now,
                 updatedAt = now,
                 deletedAt = 0L,
+                sortOrder = sortOrder,
             )
         )
         val locomotiveId = if (savedId == -1L || savedId == 0L) (old?.id ?: id) else savedId

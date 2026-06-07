@@ -24,6 +24,7 @@ data class LocomotiveEntity(
     val createdAt: Long,
     val updatedAt: Long,
     val deletedAt: Long = 0L,
+    val sortOrder: Long = 0L,
 )
 
 @Entity(

@@ -239,6 +239,7 @@ class MeasurementRepository(
             comment = "",
             updatedAt = dto.updatedAt,
             deletedAt = dto.deletedAt,
+            sortOrder = dto.sortOrder,
             createdOnPhone = false,
             createIfMissing = dto.deletedAt > 0L || importLocomotives || importWheelPairs || locomotiveDao.find(dto.series.normalizeSeries(), dto.number.normalizeNumber()) != null || locomotiveDao.findByNumber(dto.number.normalizeNumber()) != null,
         ) ?: return
@@ -273,6 +274,7 @@ class MeasurementRepository(
         comment: String,
         updatedAt: Long,
         deletedAt: Long,
+        sortOrder: Long = 0L,
         createdOnPhone: Boolean,
         createIfMissing: Boolean,
     ): ru.depo.zamerykp.data.db.LocomotiveEntity? {
@@ -292,6 +294,7 @@ class MeasurementRepository(
             createdAt = existing?.createdAt ?: now,
             updatedAt = if (updatedAt > 0L) maxOf(existing?.updatedAt ?: 0L, updatedAt) else now,
             deletedAt = deletedAt,
+            sortOrder = if (sortOrder > 0L) sortOrder else existing?.sortOrder ?: 0L,
         )
         if (existing == null) {
             locomotiveDao.upsert(entity)
@@ -306,6 +309,7 @@ class MeasurementRepository(
                 createdAt = entity.createdAt,
                 updatedAt = entity.updatedAt,
                 deletedAt = entity.deletedAt,
+                sortOrder = entity.sortOrder,
             )
         }
         val savedId = existing?.id ?: 0L
@@ -345,6 +349,7 @@ class MeasurementRepository(
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
             deletedAt = maxOf(existing?.deletedAt ?: 0L, deletedAt),
+            sortOrder = existing?.sortOrder ?: 0L,
         )
         if (existing == null) {
             locomotiveDao.upsert(entity)
@@ -359,6 +364,7 @@ class MeasurementRepository(
                 createdAt = entity.createdAt,
                 updatedAt = entity.updatedAt,
                 deletedAt = entity.deletedAt,
+                sortOrder = entity.sortOrder,
             )
         }
         val savedId = existing?.id ?: 0L

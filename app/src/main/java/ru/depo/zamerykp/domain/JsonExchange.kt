@@ -74,6 +74,7 @@ data class ReferenceLocomotiveExportDto(
     val series: String,
     val number: String,
     val wheelPairCount: Int,
+    val sortOrder: Long = 0L,
     val updatedAt: Long = 0L,
     val deletedAt: Long = 0L,
     val wheelPairs: List<ReferenceWheelPairExportDto> = emptyList(),
@@ -114,6 +115,7 @@ data class BackupLocomotiveDto(
     val createdAt: Long,
     val updatedAt: Long,
     val deletedAt: Long = 0L,
+    val sortOrder: Long = 0L,
 )
 
 @Serializable

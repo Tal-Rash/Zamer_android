@@ -11,12 +11,12 @@ import ru.depo.zamerykp.domain.MeasurementStatus
 import ru.depo.zamerykp.domain.SentStatus
 import ru.depo.zamerykp.domain.WheelSide
 
-    @Dao
-    interface LocomotiveDao {
-    @Query("SELECT * FROM locomotives ORDER BY id")
+@Dao
+interface LocomotiveDao {
+    @Query("SELECT * FROM locomotives ORDER BY sortOrder, series, number, id")
     suspend fun getAll(): List<LocomotiveEntity>
 
-    @Query("SELECT * FROM locomotives WHERE deletedAt = 0 ORDER BY series, number")
+    @Query("SELECT * FROM locomotives WHERE deletedAt = 0 ORDER BY sortOrder, series, number, id")
     fun observeAll(): Flow<List<LocomotiveEntity>>
 
     @Query("SELECT * FROM locomotives WHERE id = :id")
@@ -41,7 +41,8 @@ import ru.depo.zamerykp.domain.WheelSide
             createdOnPhone = :createdOnPhone,
             createdAt = :createdAt,
             updatedAt = :updatedAt,
-            deletedAt = :deletedAt
+            deletedAt = :deletedAt,
+            sortOrder = :sortOrder
         WHERE id = :id
         """
     )
@@ -55,7 +56,11 @@ import ru.depo.zamerykp.domain.WheelSide
         createdAt: Long,
         updatedAt: Long,
         deletedAt: Long,
+        sortOrder: Long,
     )
+
+    @Query("SELECT COALESCE(MAX(sortOrder), 0) FROM locomotives")
+    suspend fun getMaxSortOrder(): Long
 
     @Query(
         """

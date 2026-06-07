@@ -339,7 +339,7 @@ private fun LocomotivesScreen(
     val profiles by viewModel.activeProfiles.collectAsState()
     val archive by viewModel.archive.collectAsState()
     val selectedLocomotive = locomotives.firstOrNull { it.id == selectedId }
-    val sortedLocomotives = locomotives.sortedWith(compareBy<LocomotiveEntity>({ it.series.seriesRank() }, { it.series.normalizeSeriesUi() }, { it.number.numberRank() }, { it.number }))
+    val sortedLocomotives = locomotives.sortedBy { it.sortOrder }
     var series by remember { mutableStateOf("") }
     var number by remember { mutableStateOf("") }
     var count by remember { mutableStateOf("8") }
@@ -1080,7 +1080,7 @@ private fun MeasurementScreen(viewModel: AppViewModel, padding: PaddingValues, s
                 modifier = Modifier.widthIn(min = 360.dp)
             ) {
                 val filteredLocomotives = remember(selectedSeriesChoice, locomotives) {
-                    locomotives.sortedWith(compareBy<LocomotiveEntity>({ it.series.seriesRank() }, { it.series.normalizeSeriesUi() }, { it.number.numberRank() }, { it.number }))
+                    locomotives.sortedBy { it.sortOrder }
                         .filter { locomotive ->
                             val seriesKey = locomotive.series.seriesKey()
                             when (selectedSeriesChoice) {
@@ -1816,7 +1816,7 @@ private fun ArchiveLocomotivesScreen(
 ) {
     val locomotives by viewModel.locomotives.collectAsState()
     val archive by viewModel.archive.collectAsState()
-    val sortedLocomotives = locomotives.sortedWith(compareBy<LocomotiveEntity>({ it.series.seriesRank() }, { it.series.normalizeSeriesUi() }, { it.number.numberRank() }, { it.number }))
+    val sortedLocomotives = locomotives.sortedBy { it.sortOrder }
     var detailLocomotiveId by rememberSaveable { mutableStateOf<Long?>(null) }
     var detailMeasurements by remember { mutableStateOf<List<ArchiveMeasurementEntry>>(emptyList()) }
     var detailLoading by remember { mutableStateOf(false) }

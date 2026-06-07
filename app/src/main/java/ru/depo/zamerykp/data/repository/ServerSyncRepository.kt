@@ -295,6 +295,7 @@ private fun ReferenceLocomotiveExportDto.referenceEquals(other: ReferenceLocomot
     if (series.trim().uppercase() != other.series.trim().uppercase()) return false
     if (number.trim() != other.number.trim()) return false
     if (wheelPairCount != other.wheelPairCount) return false
+    if (sortOrder != other.sortOrder) return false
     if (deletedAt > 0L && other.deletedAt > 0L) return true
     if (deletedAt != other.deletedAt) return false
     if (wheelPairs.size != other.wheelPairs.size) return false
