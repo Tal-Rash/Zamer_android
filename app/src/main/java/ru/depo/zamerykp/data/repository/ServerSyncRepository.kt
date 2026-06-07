@@ -37,10 +37,20 @@ class ServerSyncRepository(
 
         val cookie = login(baseUrl, password)
         val referenceDto = exportRepository.buildReferenceExport()
-        postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(referenceDto))
+        val referencePushed = if (referenceDto.locomotives.isNotEmpty()) {
+            postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(referenceDto))
+            referenceDto.locomotives.size
+        } else {
+            0
+        }
 
         val archiveDto = exportRepository.buildArchiveExport()
-        postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(archiveDto))
+        val archivePushed = if (archiveDto.archive.isNotEmpty()) {
+            postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(archiveDto))
+            archiveDto.archive.size
+        } else {
+            0
+        }
 
         val pending = measurementRepository.getPendingMeasurements()
         var pendingPushed = 0
@@ -54,8 +64,8 @@ class ServerSyncRepository(
         val pulledArchive = pullArchiveData(baseUrl, cookie)
 
         ServerSyncResult(
-            referencePushed = referenceDto.locomotives.size,
-            archivePushed = archiveDto.archive.size,
+            referencePushed = referencePushed,
+            archivePushed = archivePushed,
             pendingPushed = pendingPushed,
             referencePulled = pulledReference,
             archivePulled = pulledArchive,
