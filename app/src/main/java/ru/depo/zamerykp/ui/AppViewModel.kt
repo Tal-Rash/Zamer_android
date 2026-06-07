@@ -26,6 +26,7 @@ import ru.depo.zamerykp.domain.VoiceCommandParser
 import ru.depo.zamerykp.domain.VoiceParseResult
 import ru.depo.zamerykp.domain.WheelSide
 import ru.depo.zamerykp.domain.suggestedFileName
+import ru.depo.zamerykp.data.repository.ServerSyncRepository
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
@@ -95,6 +96,7 @@ data class MeasurementUiState(
     val backupFileName: String = "",
     val backupShareRequestNonce: Long = 0L,
     val backupStatusMessage: String = "",
+    val syncStatusMessage: String = "",
     val importCheckMessage: String = "",
     val importUi: ImportUiState = ImportUiState(),
     val voiceFlowState: VoiceFlowState = VoiceFlowState.IDLE,
@@ -178,6 +180,18 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     fun updateRepairType(value: String) {
         sessionState.value = sessionState.value.copy(repairType = value)
+    }
+
+    fun updateSyncServerUrl(value: String) {
+        viewModelScope.launch {
+            container.settingsRepository.updateSyncServerUrl(value)
+        }
+    }
+
+    fun updateSyncPassword(value: String) {
+        viewModelScope.launch {
+            container.settingsRepository.updateSyncPassword(value)
+        }
     }
 
     fun updateDate(value: String) {
@@ -791,6 +805,30 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 archiveExportFileName = dto.suggestedFileName(),
                 archiveExportShareRequestNonce = System.currentTimeMillis(),
             )
+        }
+    }
+
+    fun syncWithServer() {
+        viewModelScope.launch {
+            val syncSettings = settings.value
+            sessionState.value = sessionState.value.copy(syncStatusMessage = "Синхронизация...")
+            try {
+                val result = container.serverSyncRepository.sync(
+                    serverBaseUrl = syncSettings.syncServerUrl,
+                    password = syncSettings.syncPassword,
+                )
+                sessionState.value = sessionState.value.copy(
+                    syncStatusMessage = buildString {
+                        append("Синхронизация завершена. ")
+                        append("Отправлено: справочник ${result.referencePushed}, архив ${result.archivePushed}, черновики ${result.pendingPushed}. ")
+                        append("Получено: справочник ${result.referencePulled}, архив ${result.archivePulled}.")
+                    }
+                )
+            } catch (error: Exception) {
+                sessionState.value = sessionState.value.copy(
+                    syncStatusMessage = "Ошибка синхронизации: ${error.message ?: error}"
+                )
+            }
         }
     }
 

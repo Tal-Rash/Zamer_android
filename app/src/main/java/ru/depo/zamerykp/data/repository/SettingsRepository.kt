@@ -22,4 +22,14 @@ class SettingsRepository(private val settingsDao: SettingsDao) {
         val current = settingsDao.get() ?: AppSettingsEntity()
         settingsDao.upsert(current.copy(keepScreenOn = enabled))
     }
+
+    suspend fun updateSyncServerUrl(url: String) {
+        val current = settingsDao.get() ?: AppSettingsEntity()
+        settingsDao.upsert(current.copy(syncServerUrl = url.trim()))
+    }
+
+    suspend fun updateSyncPassword(password: String) {
+        val current = settingsDao.get() ?: AppSettingsEntity()
+        settingsDao.upsert(current.copy(syncPassword = password))
+    }
 }

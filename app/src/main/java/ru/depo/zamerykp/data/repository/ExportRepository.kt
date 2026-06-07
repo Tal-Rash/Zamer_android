@@ -19,6 +19,8 @@ import ru.depo.zamerykp.domain.ArchiveDataExportDto
 import ru.depo.zamerykp.domain.LocomotiveExportDto
 import ru.depo.zamerykp.domain.ImportPayload
 import ru.depo.zamerykp.domain.ReferenceDataExportDto
+import ru.depo.zamerykp.domain.ReferenceLocomotiveExportDto
+import ru.depo.zamerykp.domain.ReferenceWheelPairExportDto
 import ru.depo.zamerykp.domain.MeasurementExportDto
 import ru.depo.zamerykp.domain.SideExportDto
 import ru.depo.zamerykp.domain.WheelPairExportDto
@@ -80,6 +82,34 @@ class ExportRepository(
         )
 
     suspend fun exportArchiveJson(): String = json.encodeToString(buildArchiveExport())
+
+    suspend fun buildReferenceExport(): ReferenceDataExportDto {
+        val locomotives = locomotiveDao.getAll()
+        val profiles = profileDao.getAll().groupBy { it.locomotiveId }
+        return ReferenceDataExportDto(
+            exportedAt = OffsetDateTime.now().toString(),
+            locomotives = locomotives.map { locomotive ->
+                val wheelPairs = profiles[locomotive.id].orEmpty()
+                    .sortedBy { it.number }
+                    .map { profile ->
+                        ReferenceWheelPairExportDto(
+                            number = profile.number,
+                            axisNumber = profile.axisNumber,
+                            diameterLeft = profile.kcDiameterLeft,
+                            diameterRight = profile.kcDiameterRight,
+                        )
+                    }
+                ReferenceLocomotiveExportDto(
+                    series = locomotive.series,
+                    number = locomotive.number,
+                    wheelPairCount = locomotive.wheelPairCount,
+                    wheelPairs = wheelPairs,
+                )
+            },
+        )
+    }
+
+    suspend fun exportReferenceJson(): String = json.encodeToString(buildReferenceExport())
 
     fun parseExport(text: String): MeasurementExportDto {
         return parseImportEnvelope(text).measurement

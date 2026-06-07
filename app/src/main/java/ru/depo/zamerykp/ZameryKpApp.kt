@@ -8,6 +8,7 @@ import ru.depo.zamerykp.data.repository.ExportRepository
 import ru.depo.zamerykp.data.repository.LocomotiveRepository
 import ru.depo.zamerykp.data.repository.MeasurementRepository
 import ru.depo.zamerykp.data.repository.SettingsRepository
+import ru.depo.zamerykp.data.repository.ServerSyncRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,12 +24,16 @@ class ZameryKpApp : Application() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             DatabaseSeeder(db).seedIfEmpty()
         }
+        val locomotiveRepository = LocomotiveRepository(db.locomotiveDao(), db.wheelPairProfileDao())
+        val measurementRepository = MeasurementRepository(db.measurementDao(), db.locomotiveDao(), db.wheelPairProfileDao())
+        val exportRepository = ExportRepository(db.measurementDao(), db.locomotiveDao(), db.wheelPairProfileDao())
         container = AppContainer(
-            locomotiveRepository = LocomotiveRepository(db.locomotiveDao(), db.wheelPairProfileDao()),
-            measurementRepository = MeasurementRepository(db.measurementDao(), db.locomotiveDao(), db.wheelPairProfileDao()),
-            exportRepository = ExportRepository(db.measurementDao(), db.locomotiveDao(), db.wheelPairProfileDao()),
+            locomotiveRepository = locomotiveRepository,
+            measurementRepository = measurementRepository,
+            exportRepository = exportRepository,
             backupRepository = BackupRepository(db),
             settingsRepository = SettingsRepository(db.settingsDao()),
+            serverSyncRepository = ServerSyncRepository(exportRepository, measurementRepository),
         )
     }
 }
@@ -39,4 +44,5 @@ data class AppContainer(
     val exportRepository: ExportRepository,
     val backupRepository: BackupRepository,
     val settingsRepository: SettingsRepository,
+    val serverSyncRepository: ServerSyncRepository,
 )

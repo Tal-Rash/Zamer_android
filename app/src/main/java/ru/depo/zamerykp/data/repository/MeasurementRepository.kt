@@ -44,6 +44,9 @@ class MeasurementRepository(
     fun observePendingMeasurements(): Flow<List<PendingMeasurementRow>> =
         measurementDao.observePendingMeasurements()
 
+    suspend fun getPendingMeasurements(): List<PendingMeasurementRow> =
+        measurementDao.getPendingMeasurements()
+
     suspend fun hasPendingMeasurements(): Boolean =
         measurementDao.countPendingMeasurements() > 0
 

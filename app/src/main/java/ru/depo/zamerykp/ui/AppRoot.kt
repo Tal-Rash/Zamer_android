@@ -116,10 +116,12 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -2368,6 +2370,7 @@ private fun SyncScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.measurementState.collectAsState()
+    val settings by viewModel.settings.collectAsState()
     val pendingMeasurements by viewModel.pendingMeasurements.collectAsState()
     val hasDrafts = pendingMeasurements.isNotEmpty()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -2389,6 +2392,62 @@ private fun SyncScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                // Плашка онлайн-синхронизации
+                Card(
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Share, null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Онлайн-синхронизация", style = MaterialTheme.typography.titleLarge)
+                        }
+                        Text(
+                            "Мобильное приложение подключается к веб-серверу по обычному HTTP и использует тот же вход, что и веб-версия.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            "Для отправки изменений нужен пароль редактирования из веб-входа.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        BigTextField(
+                            value = settings.syncServerUrl,
+                            onValueChange = viewModel::updateSyncServerUrl,
+                            label = "Адрес сервера",
+                            keyboardType = KeyboardType.Uri
+                        )
+                        BigTextField(
+                            value = settings.syncPassword,
+                            onValueChange = viewModel::updateSyncPassword,
+                            label = "Пароль веб-входа",
+                            keyboardType = KeyboardType.Password,
+                            visualTransformation = PasswordVisualTransformation()
+                        )
+                        Button(
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            onClick = viewModel::syncWithServer,
+                            enabled = settings.syncServerUrl.isNotBlank() && settings.syncPassword.isNotBlank(),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Text("Синхронизировать")
+                        }
+                        if (state.syncStatusMessage.isNotBlank()) {
+                            Text(
+                                state.syncStatusMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
         item {
             // Плашка статуса обмена
             StatusCard(hasDrafts, pendingMeasurements.size, onOpenDrafts)
@@ -2912,6 +2971,7 @@ private fun BigTextField(
     label: String,
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
     focusRequester: FocusRequester? = null,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
@@ -2924,6 +2984,7 @@ private fun BigTextField(
         label = { Text(label) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+        visualTransformation = visualTransformation,
         keyboardActions = keyboardActions,
     )
 }

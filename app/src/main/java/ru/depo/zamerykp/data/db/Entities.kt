@@ -106,4 +106,6 @@ data class AppSettingsEntity(
     val keepVoiceServiceEnabled: Boolean = true,
     val keepScreenOn: Boolean = true,
     val voskModelUri: String = "",
+    val syncServerUrl: String = "",
+    val syncPassword: String = "",
 )
