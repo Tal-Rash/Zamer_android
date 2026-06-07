@@ -99,6 +99,21 @@ class ServerSyncRepository(
                 localLocomotive.deletedAt > 0L && serverLocomotive.deletedAt <= 0L && localLocomotive.updatedAt >= serverLocomotive.updatedAt -> {
                     referenceToUpload += localLocomotive
                 }
+                serverLocomotive.sortOrder != localLocomotive.sortOrder && serverLocomotive.referenceEqualsIgnoringSortOrder(localLocomotive) -> {
+                    if (serverLocomotive.updatedAt >= localLocomotive.updatedAt) {
+                        measurementRepository.importReferenceData(
+                            ReferenceDataExportDto(
+                                exportedAt = serverReference.exportedAt,
+                                locomotives = listOf(serverLocomotive),
+                            ),
+                            importLocomotives = true,
+                            importWheelPairs = true,
+                        )
+                        referencePulled += 1
+                    } else {
+                        referenceToUpload += localLocomotive
+                    }
+                }
                 serverLocomotive.updatedAt > localLocomotive.updatedAt -> {
                     measurementRepository.importReferenceData(
                         ReferenceDataExportDto(
@@ -292,10 +307,15 @@ private fun ReferenceLocomotiveExportDto.referenceKey(): String =
     "${series.trim().uppercase()}|${number.trim()}"
 
 private fun ReferenceLocomotiveExportDto.referenceEquals(other: ReferenceLocomotiveExportDto): Boolean {
+    if (!referenceEqualsIgnoringSortOrder(other)) return false
+    if (sortOrder != other.sortOrder) return false
+    return true
+}
+
+private fun ReferenceLocomotiveExportDto.referenceEqualsIgnoringSortOrder(other: ReferenceLocomotiveExportDto): Boolean {
     if (series.trim().uppercase() != other.series.trim().uppercase()) return false
     if (number.trim() != other.number.trim()) return false
     if (wheelPairCount != other.wheelPairCount) return false
-    if (sortOrder != other.sortOrder) return false
     if (deletedAt > 0L && other.deletedAt > 0L) return true
     if (deletedAt != other.deletedAt) return false
     if (wheelPairs.size != other.wheelPairs.size) return false
