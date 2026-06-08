@@ -682,16 +682,16 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         bandageThickness: Double?,
     ): String? {
         if (flangeThickness != null && flangeThickness !in 20.0..33.0) {
-            return "Гребень должен быть от 20 до 33. Сейчас: $flangeThickness"
+            return "Гребень ошибка"
         }
         if (flangeWear != null && flangeWear !in 0.0..10.0) {
-            return "Прокат должен быть от 0 до 10. Сейчас: $flangeWear"
+            return "Прокат ошибка"
         }
         if (flangeSteepness != null && flangeSteepness !in 5.0..15.0) {
-            return "Крутизна должна быть от 5 до 15. Сейчас: $flangeSteepness"
+            return "Крутизна ошибка"
         }
         if (bandageThickness != null && bandageThickness < 30.0) {
-            return "Бандаж должен быть не меньше 30. Сейчас: $bandageThickness"
+            return "Бандаж ошибка"
         }
         return null
     }
