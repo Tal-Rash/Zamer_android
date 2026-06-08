@@ -47,8 +47,14 @@ class ServerSyncRepository(
         require(password.isNotBlank()) { "Введите пароль веб-входа." }
 
         val cookie = login(baseUrl, password)
-        val serverReference = pullReferenceDto(baseUrl, cookie)
-        val localReference = exportRepository.buildReferenceExport()
+        val pulledServerReference = pullReferenceDto(baseUrl, cookie)
+        val serverReference = pulledServerReference.copy(
+            locomotives = pulledServerReference.locomotives.collapseReferenceLocomotives(),
+        )
+        val builtLocalReference = exportRepository.buildReferenceExport()
+        val localReference = builtLocalReference.copy(
+            locomotives = builtLocalReference.locomotives.collapseReferenceLocomotives(),
+        )
         val localMap = localReference.locomotives.associateBy { it.referenceKey() }
         val serverMap = serverReference.locomotives.associateBy { it.referenceKey() }
 
@@ -150,7 +156,7 @@ class ServerSyncRepository(
         val referencePushed = if (referenceToUpload.isNotEmpty()) {
             val payload = localReference.copy(
                 exportedAt = serverReference.exportedAt,
-                locomotives = referenceToUpload.distinctBy { it.referenceKey() },
+                locomotives = referenceToUpload.collapseReferenceLocomotives(),
             )
             postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(payload))
             payload.locomotives.size
@@ -189,7 +195,10 @@ class ServerSyncRepository(
         require(baseUrl.isNotBlank()) { "Введите адрес сервера." }
         require(password.isNotBlank()) { "Введите пароль веб-входа." }
         val cookie = login(baseUrl, password)
-        val referenceDto = exportRepository.buildReferenceExport()
+        val builtReferenceDto = exportRepository.buildReferenceExport()
+        val referenceDto = builtReferenceDto.copy(
+            locomotives = builtReferenceDto.locomotives.collapseReferenceLocomotives(),
+        )
         if (referenceDto.locomotives.isEmpty()) return@withContext 0
         postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(referenceDto))
         referenceDto.locomotives.size
@@ -325,4 +334,24 @@ private fun ReferenceLocomotiveExportDto.referenceEqualsIgnoringSortOrder(other:
             left.diameterLeft == right.diameterLeft &&
             left.diameterRight == right.diameterRight
     }
+}
+
+private fun List<ReferenceLocomotiveExportDto>.collapseReferenceLocomotives(): List<ReferenceLocomotiveExportDto> {
+    return this
+        .groupBy { it.referenceKey() }
+        .values
+        .mapNotNull { group ->
+            group.maxWithOrNull(
+                compareBy<ReferenceLocomotiveExportDto> { it.updatedAt }
+                    .thenBy { it.deletedAt }
+                    .thenBy { it.sortOrder },
+            )
+        }
+        .sortedWith(
+            compareBy<ReferenceLocomotiveExportDto> { it.sortOrder }
+                .thenByDescending { it.updatedAt }
+                .thenByDescending { it.deletedAt }
+                .thenBy { it.series.trim().uppercase() }
+                .thenBy { it.number.trim() },
+        )
 }

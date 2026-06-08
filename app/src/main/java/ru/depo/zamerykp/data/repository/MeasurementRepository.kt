@@ -165,6 +165,7 @@ class MeasurementRepository(
                 comment = dto.locomotive.comment,
                 deletedAt = dto.locomotive.deletedAt,
                 allowedArchiveLocomotives = allowedArchiveLocomotives,
+                preserveExistingWheelPairCount = true,
             )
         } else {
             ensureImportedLocomotive(
@@ -176,6 +177,7 @@ class MeasurementRepository(
                 deletedAt = dto.locomotive.deletedAt,
                 createdOnPhone = dto.locomotive.isNew,
                 createIfMissing = importLocomotive || importArchive,
+                preserveExistingWheelPairCount = true,
             )
         } ?: return dto.measurementId
 
@@ -242,6 +244,7 @@ class MeasurementRepository(
             sortOrder = dto.sortOrder,
             createdOnPhone = false,
             createIfMissing = dto.deletedAt > 0L || importLocomotives || importWheelPairs || locomotiveDao.find(dto.series.normalizeSeries(), dto.number.normalizeNumber()) != null || locomotiveDao.findByNumber(dto.number.normalizeNumber()) != null,
+            preserveExistingWheelPairCount = false,
         ) ?: return
         if (!importWheelPairs) {
             if (importLocomotives) {
@@ -277,6 +280,7 @@ class MeasurementRepository(
         sortOrder: Long = 0L,
         createdOnPhone: Boolean,
         createIfMissing: Boolean,
+        preserveExistingWheelPairCount: Boolean = false,
     ): ru.depo.zamerykp.data.db.LocomotiveEntity? {
         val now = System.currentTimeMillis()
         val normalizedSeries = series.normalizeSeries()
@@ -284,11 +288,16 @@ class MeasurementRepository(
         val existing = locomotiveDao.find(normalizedSeries, normalizedNumber)
             ?: locomotiveDao.findByNumber(normalizedNumber)
         if (existing == null && !createIfMissing) return null
+        val resolvedWheelPairCount = if (existing != null && preserveExistingWheelPairCount) {
+            existing.wheelPairCount
+        } else {
+            wheelPairCount.coerceAtLeast(1)
+        }
         val entity = ru.depo.zamerykp.data.db.LocomotiveEntity(
             id = existing?.id ?: 0L,
             series = normalizedSeries,
             number = normalizedNumber,
-            wheelPairCount = wheelPairCount.coerceAtLeast(1),
+            wheelPairCount = resolvedWheelPairCount,
             comment = if (comment.isBlank()) existing?.comment.orEmpty() else comment.trim(),
             createdOnPhone = existing?.createdOnPhone ?: createdOnPhone,
             createdAt = existing?.createdAt ?: now,
@@ -328,6 +337,7 @@ class MeasurementRepository(
         comment: String,
         deletedAt: Long,
         allowedArchiveLocomotives: Set<String>? = null,
+        preserveExistingWheelPairCount: Boolean = false,
     ): ru.depo.zamerykp.data.db.LocomotiveEntity? {
         val now = System.currentTimeMillis()
         val normalizedSeries = series.normalizeSeries()
@@ -343,7 +353,11 @@ class MeasurementRepository(
             id = existing?.id ?: 0L,
             series = if (existing?.series.isNullOrBlank()) normalizedSeries else existing.series.normalizeSeries(),
             number = normalizedNumber,
-            wheelPairCount = maxOf(existing?.wheelPairCount ?: 1, wheelPairCount.coerceAtLeast(1)),
+            wheelPairCount = if (existing != null && preserveExistingWheelPairCount) {
+                existing.wheelPairCount
+            } else {
+                maxOf(existing?.wheelPairCount ?: 1, wheelPairCount.coerceAtLeast(1))
+            },
             comment = if (comment.isBlank()) existing?.comment.orEmpty() else comment.trim(),
             createdOnPhone = existing?.createdOnPhone ?: false,
             createdAt = existing?.createdAt ?: now,

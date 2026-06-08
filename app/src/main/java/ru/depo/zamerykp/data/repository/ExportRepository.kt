@@ -86,7 +86,7 @@ class ExportRepository(
     suspend fun exportArchiveJson(): String = json.encodeToString(buildArchiveExport())
 
     suspend fun buildReferenceExport(): ReferenceDataExportDto {
-        val locomotives = locomotiveDao.getAll()
+        val locomotives = locomotiveDao.getAll().collapseReferenceLocomotives()
         val profiles = profileDao.getAll().groupBy { it.locomotiveId }
         return ReferenceDataExportDto(
             exportedAt = OffsetDateTime.now().toString(),
@@ -102,7 +102,7 @@ class ExportRepository(
                         )
                     }
                 ReferenceLocomotiveExportDto(
-                    series = locomotive.series,
+                    series = locomotive.series.trim().uppercase(),
                     number = locomotive.number,
                     wheelPairCount = locomotive.wheelPairCount,
                     sortOrder = locomotive.sortOrder,
@@ -228,6 +228,26 @@ class ExportRepository(
             bandageDiameter = obj["bandageDiameter"]?.jsonPrimitive?.doubleOrNull,
         )
     }
+}
+
+private fun List<ru.depo.zamerykp.data.db.LocomotiveEntity>.collapseReferenceLocomotives(): List<ru.depo.zamerykp.data.db.LocomotiveEntity> {
+    return this
+        .groupBy { "${it.series.trim().uppercase()}|${it.number.trim()}" }
+        .values
+        .mapNotNull { group ->
+            group.maxWithOrNull(
+                compareBy<ru.depo.zamerykp.data.db.LocomotiveEntity> { it.updatedAt }
+                    .thenBy { it.deletedAt }
+                    .thenBy { it.id },
+            )
+        }
+        .sortedWith(
+            compareBy<ru.depo.zamerykp.data.db.LocomotiveEntity> { it.sortOrder }
+                .thenByDescending { it.updatedAt }
+                .thenByDescending { it.deletedAt }
+                .thenBy { it.series.trim().uppercase() }
+                .thenBy { it.number.trim() },
+        )
 }
 
 private fun ru.depo.zamerykp.data.db.WheelSideMeasurementEntity?.toDto(): SideExportDto =
