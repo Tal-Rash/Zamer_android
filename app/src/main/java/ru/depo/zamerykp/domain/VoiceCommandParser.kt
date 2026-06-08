@@ -41,6 +41,16 @@ data class VoiceParseResult(
 )
 
 class VoiceCommandParser {
+    private val startWords = setOf(
+        "замер",
+        "замеры",
+        "новый",
+        "новая",
+        "новой",
+        "начать",
+        "начни",
+        "старт",
+    )
     private val ordinals = mapOf(
         "первая" to 1, "первый" to 1, "первую" to 1, "один" to 1, "одна" to 1, "одно" to 1,
         "вторая" to 2, "второй" to 2, "вторую" to 2, "два" to 2, "две" to 2,
@@ -147,6 +157,12 @@ class VoiceCommandParser {
                     bandageThickness = numbers[3],
                 )
             }
+            if (isSimpleSideSelection(text)) {
+                return VoiceCommand.StartMeasurementWithSide(
+                    wheelPairNumber = pairNumber,
+                    side = side,
+                )
+            }
             return VoiceCommand.SelectSide(pairNumber, side)
         }
 
@@ -212,6 +228,7 @@ class VoiceCommandParser {
             .takeWhile { token -> !token.startsWith("лев") && !token.startsWith("пра") && token != "сторона" }
             .filter { it.isNotBlank() }
             .toList()
+            .dropWhile { it in startWords }
 
         prefixTokens
             .asSequence()
@@ -223,6 +240,23 @@ class VoiceCommandParser {
             .asSequence()
             .mapNotNull { index -> parseIntegerAt(prefixTokens, index)?.first }
             .firstOrNull()
+    }
+
+    private fun isSimpleSideSelection(text: String): Boolean {
+        val prefixTokens = text
+            .split(" ")
+            .asSequence()
+            .map { it.trim('.', ',', ':', ';') }
+            .takeWhile { token -> !token.startsWith("лев") && !token.startsWith("пра") && token != "сторона" }
+            .filter { it.isNotBlank() }
+            .toList()
+            .dropWhile { it in startWords }
+
+        if (prefixTokens.isEmpty()) return false
+        if (prefixTokens.any { it in listOf("гребень", "прокат", "крутизна", "бандаж") }) return false
+        return prefixTokens.all { token ->
+            ordinals.containsKey(token) || token.toIntOrNull() != null || parseIntegerAt(listOf(token), 0) != null
+        }
     }
 
     private fun afterSideMarker(text: String): String {

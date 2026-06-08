@@ -207,6 +207,7 @@ class SpeechRecognizerController(
             value.contains("дальше") ||
             value.contains("закончить") ||
             value.contains("замеры окончены") ||
+            isStartWithSideCommand(value) ||
             value.startsWith("гребень") ||
             value.startsWith("прокат") ||
             value.startsWith("крутизна") ||
@@ -221,7 +222,30 @@ class SpeechRecognizerController(
 
     private fun isStartWithSideCommand(text: String): Boolean {
         val value = text.lowercase().replace('ё', 'е').trim()
-        return value.startsWith("замер ") && (value.contains(" лев") || value.contains(" пра"))
+        val tokens = value.split(Regex("\\s+")).filter { it.isNotBlank() }
+        val sideIndex = tokens.indexOfFirst { it.startsWith("лев") || it.startsWith("пра") }
+        if (sideIndex <= 0) return false
+        val beforeSide = tokens.take(sideIndex)
+            .dropWhile { it in setOf("замер", "замеры", "новый", "новая", "новой", "начать", "начни", "старт") }
+        if (beforeSide.isEmpty()) return false
+        return beforeSide.all { token ->
+            token == "сторона" ||
+                token.toIntOrNull() != null ||
+                token in setOf(
+                "первая", "первый", "первую", "один", "одна", "одно",
+                "вторая", "второй", "вторую", "два", "две",
+                "третья", "третий", "третью", "три",
+                "четвертая", "четвёртая", "четвертый", "четвёртый", "четыре",
+                "пятая", "пятый", "пять",
+                "шестая", "шестой", "шесть",
+                "седьмая", "седьмой", "семь",
+                "восьмая", "восьмой", "восемь",
+                "девятая", "девятый", "девять",
+                "десятая", "десятый", "десять",
+                "одиннадцатая", "одиннадцатый",
+                "двенадцатая", "двенадцатый"
+            )
+        }
     }
 
     private fun isCompleteValueCommand(text: String): Boolean {
