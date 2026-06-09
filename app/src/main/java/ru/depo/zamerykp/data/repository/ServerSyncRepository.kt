@@ -7,6 +7,7 @@ import kotlinx.serialization.json.Json
 import ru.depo.zamerykp.domain.ImportPayload
 import ru.depo.zamerykp.domain.ReferenceDataExportDto
 import ru.depo.zamerykp.domain.ReferenceLocomotiveExportDto
+import ru.depo.zamerykp.domain.MeasurementStatus
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -164,11 +165,21 @@ class ServerSyncRepository(
             0
         }
         val pending = measurementRepository.getPendingMeasurements()
+            .filter { it.status == MeasurementStatus.DRAFT }
         var pendingPushed = 0
         for (item in pending) {
             val measurementDto = exportRepository.buildExport(item.measurementId)
             postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(measurementDto))
             pendingPushed += 1
+        }
+
+        val syncableMeasurements = measurementRepository.getSyncableMeasurements()
+        var archivePushed = 0
+        for (item in syncableMeasurements) {
+            val measurementDto = exportRepository.buildExport(item.measurementId)
+            postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(measurementDto))
+            measurementRepository.markSent(item.measurementId)
+            archivePushed += 1
         }
 
         val pulledArchive = pullArchiveData(
@@ -179,7 +190,7 @@ class ServerSyncRepository(
 
         ServerSyncResult(
             referencePushed = referencePushed,
-            archivePushed = 0,
+            archivePushed = archivePushed,
             pendingPushed = pendingPushed,
             referencePulled = referencePulled,
             archivePulled = pulledArchive,

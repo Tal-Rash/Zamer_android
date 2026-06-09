@@ -47,6 +47,9 @@ class MeasurementRepository(
     suspend fun getPendingMeasurements(): List<PendingMeasurementRow> =
         measurementDao.getPendingMeasurements()
 
+    suspend fun getSyncableMeasurements(): List<PendingMeasurementRow> =
+        measurementDao.getSyncableMeasurements()
+
     suspend fun hasPendingMeasurements(): Boolean =
         measurementDao.countPendingMeasurements() > 0
 

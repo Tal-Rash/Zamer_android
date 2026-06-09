@@ -822,7 +822,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 sessionState.value = sessionState.value.copy(
                     syncStatusMessage = buildString {
                         append("Синхронизация завершена. ")
-                        append("Отправлено: черновики ${result.pendingPushed}. ")
+                        append("Отправлено: черновики ${result.pendingPushed}, замеры ${result.archivePushed}. ")
                         append("Получено: справочник ${result.referencePulled}, архив ${result.archivePulled}.")
                     }
                         .plus(

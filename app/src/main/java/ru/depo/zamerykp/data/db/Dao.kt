@@ -218,6 +218,25 @@ interface MeasurementDao {
 
     @Query(
         """
+        SELECT s.id AS measurementId,
+               s.measurementDate,
+               s.repairType,
+               s.status AS status,
+               s.sentStatus AS sentStatus,
+               l.series AS series,
+               l.number AS number
+        FROM measurement_sessions s
+        INNER JOIN locomotives l ON l.id = s.locomotiveId
+        WHERE s.source = 'PHONE'
+          AND s.status = 'FINISHED'
+          AND s.sentStatus != 'SENT'
+        ORDER BY s.updatedAt DESC
+        """
+    )
+    suspend fun getSyncableMeasurements(): List<PendingMeasurementRow>
+
+    @Query(
+        """
         SELECT COUNT(*)
         FROM measurement_sessions
         WHERE source = 'PHONE'
