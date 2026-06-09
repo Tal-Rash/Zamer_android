@@ -2712,14 +2712,14 @@ private fun StatusCard(hasDrafts: Boolean, draftsCount: Int, onOpenDrafts: () ->
                 )
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Есть черновики ($draftsCount)",
+                        "Ожидают отправки ($draftsCount)",
                         modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.titleMedium,
                         color = color,
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        "Сначала завершите экспорт черновиков.",
+                        "Синхронизируйте приложение для передачи данных.",
                         modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.bodySmall,
                         color = color.copy(alpha = 0.8f),
@@ -2982,7 +2982,7 @@ private fun DraftsScreen(
     ) {
         // Заголовок вкладки черновиков
         Text(
-            "Черновики",
+            "Очередь отправки",
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center
@@ -2994,7 +2994,7 @@ private fun DraftsScreen(
         )
         if (drafts.isEmpty()) {
             Card {
-                Text("Черновиков нет.", modifier = Modifier.padding(16.dp))
+                Text("Нет данных для отправки.", modifier = Modifier.padding(16.dp))
             }
         } else {
             Column(
