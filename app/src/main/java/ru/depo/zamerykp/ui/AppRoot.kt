@@ -1968,8 +1968,8 @@ private fun ArchiveLocomotivesScreen(
                             if (latest != null) {
                                 Text(
                                     text = when (latest.sentStatus) {
-                                        SentStatus.SENT -> "Синхр."
-                                        SentStatus.EXPORTED -> "Экспорт."
+                                        SentStatus.SENT -> "Синхронизирован"
+                                        SentStatus.EXPORTED -> "Экспортирован"
                                         SentStatus.NOT_SENT -> "Готов"
                                     },
                                     style = MaterialTheme.typography.bodySmall,
