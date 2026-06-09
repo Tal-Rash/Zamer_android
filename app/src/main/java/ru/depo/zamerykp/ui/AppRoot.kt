@@ -1082,17 +1082,26 @@ private fun MeasurementScreen(viewModel: AppViewModel, padding: PaddingValues, s
                         }
                     }
                 }
+                val completedPairsCount = (1..totalWheelPairs).count { num ->
+                    val l = state.sides.firstOrNull { it.wheelPairNumber == num && it.side == WheelSide.LEFT }
+                    val r = state.sides.firstOrNull { it.wheelPairNumber == num && it.side == WheelSide.RIGHT }
+                    l?.flangeThickness != null && l.flangeWear != null && l.flangeSteepness != null && l.bandageThickness != null &&
+                    r?.flangeThickness != null && r.flangeWear != null && r.flangeSteepness != null && r.bandageThickness != null
+                }
+                val isAllFilled = completedPairsCount == totalWheelPairs
+
                 if (state.activeSessionStatus == MeasurementStatus.DRAFT) {
                     item {
                         Button(
                             modifier = Modifier.fillMaxWidth().height(46.dp),
                             shape = MaterialTheme.shapes.medium,
+                            enabled = isAllFilled,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             onClick = { viewModel.finishMeasurement(state.activeSessionId ?: "") }
                         ) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Завершить замер", maxLines = 1, softWrap = false)
+                            Text(if (isAllFilled) "Завершить замер" else "Заполните все оси", maxLines = 1, softWrap = false)
                         }
                     }
                 }
