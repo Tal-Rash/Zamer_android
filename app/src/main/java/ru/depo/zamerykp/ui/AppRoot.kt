@@ -350,6 +350,9 @@ private fun LocomotivesScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var detailLocomotiveId by remember { mutableStateOf<Long?>(null) }
     var showKpDialog by remember { mutableStateOf(false) }
+    var showLastMeasurementDialog by remember { mutableStateOf(false) }
+    var lastMeasurementDto by remember { mutableStateOf<MeasurementExportDto?>(null) }
+    val scope = rememberCoroutineScope()
 
     val detailLocomotive = sortedLocomotives.firstOrNull { it.id == detailLocomotiveId }
     val detailIndex = sortedLocomotives.indexOfFirst { it.id == detailLocomotiveId }
@@ -527,6 +530,18 @@ private fun LocomotivesScreen(
                         openMeasurement()
                     },
                     onOpenWheelPairs = { showKpDialog = true },
+                    onOpenLastMeasurement = {
+                        // Загружаем DTO последнего замера и открываем диалог
+                        scope.launch {
+                            lastMeasurementDto = null
+                            showLastMeasurementDialog = true
+                            latestArchive?.let { archive ->
+                                lastMeasurementDto = runCatching {
+                                    viewModel.buildArchiveMeasurement(archive.measurementId)
+                                }.getOrNull()
+                            }
+                        }
+                    },
                     onStartMeasurement = {
                         viewModel.selectLocomotive(detailLocomotive.id)
                         viewModel.startNewMeasurement()
@@ -613,6 +628,62 @@ private fun LocomotivesScreen(
         )
     }
 
+    // Диалог последнего замера (таблица в стиле архива)
+    if (showLastMeasurementDialog) {
+        Dialog(onDismissRequest = { showLastMeasurementDialog = false }) {
+            Card(
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val dto = lastMeasurementDto
+                    if (dto == null) {
+                        Text(
+                            text = "Загрузка...",
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        // Заголовок
+                        Text(
+                            text = "${dto.locomotive.series} ${dto.locomotive.number} • ${dto.measurementDate.displayDate()} • ${dto.repairType}",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                            maxLines = 2
+                        )
+                        // Таблица с данными КП
+                        BoxWithConstraints(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val columnWidth = maxWidth / 11f
+                            Column {
+                                MeasurementArchiveGridHeader(columnWidth)
+                                dto.wheelPairs.forEach { pair ->
+                                    TableRow(pair, columnWidth)
+                                }
+                            }
+                        }
+                    }
+                    // Кнопка закрытия
+                    TextButton(
+                        onClick = { showLastMeasurementDialog = false },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Закрыть")
+                    }
+                }
+            }
+        }
+    }
+
     if (selectedLocomotive != null && showKpDialog) {
         AlertDialog(
             onDismissRequest = { showKpDialog = false },
@@ -661,6 +732,7 @@ private fun LocomotiveDetailScreen(
     onBack: () -> Unit,
     onResumeDraft: () -> Unit,
     onOpenWheelPairs: () -> Unit,
+    onOpenLastMeasurement: (() -> Unit)? = null,
     onStartMeasurement: () -> Unit,
     onOpenVoiceMeasurement: () -> Unit,
     onDelete: () -> Unit,
@@ -798,8 +870,9 @@ private fun LocomotiveDetailScreen(
             Card(
                 shape = MaterialTheme.shapes.medium,
                 onClick = {
-                    if (hasActiveDraft) {
-                        onResumeDraft()
+                    when {
+                        hasActiveDraft -> onResumeDraft()
+                        latestArchive != null -> onOpenLastMeasurement?.invoke()
                     }
                 },
                 colors = CardDefaults.cardColors(
@@ -811,6 +884,16 @@ private fun LocomotiveDetailScreen(
                     Text("Заполнено колесных пар", style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                     Text(progressText, style = MaterialTheme.typography.titleLarge, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                     Text(statusText, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    // Подсказка о кликабельности
+                    if (!hasActiveDraft && latestArchive != null) {
+                        Text(
+                            "Нажмите для просмотра",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                            color = statusContentColor.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }

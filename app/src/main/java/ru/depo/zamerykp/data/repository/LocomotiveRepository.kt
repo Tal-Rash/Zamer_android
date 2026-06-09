@@ -3,17 +3,37 @@ package ru.depo.zamerykp.data.repository
 import kotlinx.coroutines.flow.Flow
 import ru.depo.zamerykp.data.db.LocomotiveDao
 import ru.depo.zamerykp.data.db.LocomotiveEntity
+import ru.depo.zamerykp.data.db.ManualRepairDateDao
+import ru.depo.zamerykp.data.db.ManualRepairDateEntity
 import ru.depo.zamerykp.data.db.WheelPairProfileDao
 import ru.depo.zamerykp.data.db.WheelPairProfileEntity
 
 class LocomotiveRepository(
     private val locomotiveDao: LocomotiveDao,
     private val profileDao: WheelPairProfileDao,
+    private val manualRepairDao: ManualRepairDateDao
 ) {
     fun observeLocomotives(): Flow<List<LocomotiveEntity>> = locomotiveDao.observeAll()
 
     fun observeProfiles(locomotiveId: Long): Flow<List<WheelPairProfileEntity>> =
         profileDao.observeForLocomotive(locomotiveId)
+
+    suspend fun getAllLocomotives() = locomotiveDao.getAll()
+
+    fun observeManualRepairDates(locomotiveId: Long) = manualRepairDao.observeForLocomotive(locomotiveId)
+
+    suspend fun saveManualRepairDate(locomotiveId: Long, repairType: String, date: String) {
+        manualRepairDao.upsert(
+            ManualRepairDateEntity(
+                locomotiveId = locomotiveId,
+                repairType = repairType.trim(),
+                measurementDate = date,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun saveLocomotives(locomotives: List<LocomotiveEntity>) = locomotiveDao.upsertAll(locomotives)
 
     suspend fun getLocomotive(id: Long): LocomotiveEntity? = locomotiveDao.getById(id)
 

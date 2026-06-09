@@ -15,8 +15,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MeasurementSessionEntity::class,
         WheelSideMeasurementEntity::class,
         AppSettingsEntity::class,
+        ManualRepairDateEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -25,6 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun wheelPairProfileDao(): WheelPairProfileDao
     abstract fun measurementDao(): MeasurementDao
     abstract fun settingsDao(): SettingsDao
+    abstract fun manualRepairDateDao(): ManualRepairDateDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -77,6 +79,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `manual_repair_dates` (`locomotiveId` INTEGER NOT NULL, `repairType` TEXT NOT NULL, `measurementDate` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, PRIMARY KEY(`locomotiveId`, `repairType`), FOREIGN KEY(`locomotiveId`) REFERENCES `locomotives`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_manual_repair_dates_locomotiveId` ON `manual_repair_dates` (`locomotiveId`)")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "zamery_kp.db")
                 .addMigrations(
@@ -87,7 +96,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
-                    MIGRATION_8_9
+                    MIGRATION_8_9,
+                    MIGRATION_9_10
                 )
                 .build()
     }

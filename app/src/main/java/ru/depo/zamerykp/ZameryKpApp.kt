@@ -16,7 +16,11 @@ class ZameryKpApp : Application() {
     override fun onCreate() {
         super.onCreate()
         val db = AppDatabase.create(this)
-        val locomotiveRepository = LocomotiveRepository(db.locomotiveDao(), db.wheelPairProfileDao())
+        val locomotiveRepository = LocomotiveRepository(
+            db.locomotiveDao(),
+            db.wheelPairProfileDao(),
+            db.manualRepairDateDao()
+        )
         val measurementRepository = MeasurementRepository(db.measurementDao(), db.locomotiveDao(), db.wheelPairProfileDao())
         val exportRepository = ExportRepository(db.measurementDao(), db.locomotiveDao(), db.wheelPairProfileDao())
         container = AppContainer(

@@ -31,6 +31,9 @@ interface LocomotiveDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: LocomotiveEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<LocomotiveEntity>)
+
     @Query(
         """
         UPDATE locomotives
@@ -193,6 +196,7 @@ interface MeasurementDao {
         INNER JOIN locomotives l ON l.id = s.locomotiveId
         WHERE s.source = 'PHONE'
           AND s.sentStatus != 'EXPORTED'
+          AND s.status = 'DRAFT'
         ORDER BY s.updatedAt DESC
         """
     )
@@ -211,6 +215,8 @@ interface MeasurementDao {
         INNER JOIN locomotives l ON l.id = s.locomotiveId
         WHERE s.source = 'PHONE'
           AND s.sentStatus != 'EXPORTED'
+          AND s.status = 'DRAFT'
+
         ORDER BY s.updatedAt DESC
         """
     )
@@ -241,6 +247,7 @@ interface MeasurementDao {
         FROM measurement_sessions
         WHERE source = 'PHONE'
           AND sentStatus != 'EXPORTED'
+          AND status = 'DRAFT'
         """
     )
     suspend fun countPendingMeasurements(): Int
@@ -292,4 +299,22 @@ interface SettingsDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: AppSettingsEntity)
+}
+
+@Dao
+interface ManualRepairDateDao {
+    @Query("SELECT * FROM manual_repair_dates WHERE deletedAt IS NULL")
+    suspend fun getAllActive(): List<ManualRepairDateEntity>
+
+    @Query("SELECT * FROM manual_repair_dates")
+    suspend fun getAll(): List<ManualRepairDateEntity>
+
+    @Query("SELECT * FROM manual_repair_dates WHERE locomotiveId = :locomotiveId AND deletedAt IS NULL")
+    fun observeForLocomotive(locomotiveId: Long): Flow<List<ManualRepairDateEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: ManualRepairDateEntity)
+
+    @Query("DELETE FROM manual_repair_dates")
+    suspend fun deleteAll()
 }

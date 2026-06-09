@@ -112,3 +112,24 @@ data class AppSettingsEntity(
     val syncServerUrl: String = "",
     val syncPassword: String = "",
 )
+
+@Entity(
+    tableName = "manual_repair_dates",
+    primaryKeys = ["locomotiveId", "repairType"],
+    foreignKeys = [
+        ForeignKey(
+            entity = LocomotiveEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["locomotiveId"],
+            onDelete = ForeignKey.CASCADE,
+        )
+    ],
+    indices = [Index("locomotiveId")]
+)
+data class ManualRepairDateEntity(
+    val locomotiveId: Long,
+    val repairType: String,
+    val measurementDate: String,
+    val updatedAt: Long,
+    val deletedAt: Long? = null
+)
