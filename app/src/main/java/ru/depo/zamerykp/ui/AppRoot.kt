@@ -1082,29 +1082,6 @@ private fun MeasurementScreen(viewModel: AppViewModel, padding: PaddingValues, s
                         }
                     }
                 }
-                val completedPairsCount = (1..totalWheelPairs).count { num ->
-                    val l = state.sides.firstOrNull { it.wheelPairNumber == num && it.side == WheelSide.LEFT }
-                    val r = state.sides.firstOrNull { it.wheelPairNumber == num && it.side == WheelSide.RIGHT }
-                    l?.flangeThickness != null && l.flangeWear != null && l.flangeSteepness != null && l.bandageThickness != null &&
-                    r?.flangeThickness != null && r.flangeWear != null && r.flangeSteepness != null && r.bandageThickness != null
-                }
-                val isAllFilled = completedPairsCount == totalWheelPairs
-
-                if (state.activeSessionStatus == MeasurementStatus.DRAFT) {
-                    item {
-                        Button(
-                            modifier = Modifier.fillMaxWidth().height(46.dp),
-                            shape = MaterialTheme.shapes.medium,
-                            enabled = isAllFilled,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            onClick = { viewModel.finishMeasurement(state.activeSessionId ?: "") }
-                        ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (isAllFilled) "Завершить замер" else "Заполните все оси", maxLines = 1, softWrap = false)
-                        }
-                    }
-                }
                 item {
                     Text(
                         "Заполнено КП: ${state.filledWheelPairs} из $totalWheelPairs",
@@ -1701,16 +1678,28 @@ private fun MeasurementEditor(
                 Spacer(Modifier.width(10.dp))
                 Text(if (voiceActive) "Стоп" else "Голос")
             }
-            OutlinedButton(
-                modifier = Modifier.weight(1f).height(50.dp),
-                shape = MaterialTheme.shapes.medium,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                onClick = onOpenExchange
-            ) {
-                Icon(Icons.Default.Share, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
-                Text("Экспорт")
+            val completedPairsCount = (1..totalWheelPairs).count { num ->
+                val l = state.sides.firstOrNull { it.wheelPairNumber == num && it.side == WheelSide.LEFT }
+                val r = state.sides.firstOrNull { it.wheelPairNumber == num && it.side == WheelSide.RIGHT }
+                l?.flangeThickness != null && l.flangeWear != null && l.flangeSteepness != null && l.bandageThickness != null &&
+                r?.flangeThickness != null && r.flangeWear != null && r.flangeSteepness != null && r.bandageThickness != null
+            }
+            val isAllFilled = completedPairsCount == totalWheelPairs
+
+            if (state.activeSessionStatus == MeasurementStatus.DRAFT) {
+                Button(
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    enabled = isAllFilled,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    onClick = { viewModel.finishMeasurement(state.activeSessionId ?: "") }
+                ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (isAllFilled) "Завершить" else "В процессе", maxLines = 1, softWrap = false)
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
 
