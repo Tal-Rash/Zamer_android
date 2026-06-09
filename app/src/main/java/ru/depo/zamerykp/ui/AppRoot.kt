@@ -1981,6 +1981,12 @@ private fun ArchiveLocomotivesScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     textAlign = TextAlign.Center
                                 )
+                            } else {
+                                Text(
+                                    text = " ",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                     }
