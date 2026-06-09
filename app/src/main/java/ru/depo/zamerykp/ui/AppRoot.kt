@@ -2396,8 +2396,8 @@ private fun MeasurementArchiveDetailScreen(
 private fun TableRow(pair: ru.depo.zamerykp.domain.WheelPairExportDto, columnWidth: androidx.compose.ui.unit.Dp) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         TableCell(text = pair.number.toString(), width = columnWidth, height = 36.dp, bold = true)
-        MeasurementGroupCells(pair.left.flangeThickness, pair.right.flangeThickness, columnWidth)
         MeasurementGroupCells(pair.left.flangeWear, pair.right.flangeWear, columnWidth)
+        MeasurementGroupCells(pair.left.flangeThickness, pair.right.flangeThickness, columnWidth)
         MeasurementGroupCells(pair.left.flangeSteepness, pair.right.flangeSteepness, columnWidth)
         MeasurementGroupCells(pair.left.bandageThickness, pair.right.bandageThickness, columnWidth)
         MeasurementGroupCells(pair.left.bandageDiameter, pair.right.bandageDiameter, columnWidth)
@@ -2408,8 +2408,8 @@ private fun TableRow(pair: ru.depo.zamerykp.domain.WheelPairExportDto, columnWid
 private fun MeasurementArchiveGridHeader(columnWidth: androidx.compose.ui.unit.Dp) {
     Row {
         TableCell(text = "№\nКП", width = columnWidth, height = 72.dp, bold = true, background = MaterialTheme.colorScheme.surfaceVariant)
-        MeasurementGroupHeader("ТГ", columnWidth)
         MeasurementGroupHeader("ПР", columnWidth)
+        MeasurementGroupHeader("ТГ", columnWidth)
         MeasurementGroupHeader("КГ", columnWidth)
         MeasurementGroupHeader("ТБ", columnWidth)
         MeasurementGroupHeader("ДБ", columnWidth)
