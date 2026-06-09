@@ -260,6 +260,9 @@ interface MeasurementDao {
     @Query("UPDATE measurement_sessions SET sentStatus = :sentStatus, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateSentStatus(id: String, sentStatus: SentStatus, updatedAt: Long)
 
+    @Query("UPDATE measurement_sessions SET sentStatus = :sentStatus, lastSyncedAt = :lastSyncedAt, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateSentStatusWithSyncTime(id: String, sentStatus: SentStatus, lastSyncedAt: Long, updatedAt: Long)
+
     @Query("DELETE FROM measurement_sessions WHERE id = :id")
     suspend fun deleteSession(id: String)
 

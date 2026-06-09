@@ -164,14 +164,7 @@ class ServerSyncRepository(
         } else {
             0
         }
-        val pending = measurementRepository.getPendingMeasurements()
-            .filter { it.status == MeasurementStatus.DRAFT }
-        var pendingPushed = 0
-        for (item in pending) {
-            val measurementDto = exportRepository.buildExport(item.measurementId)
-            postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(measurementDto))
-            pendingPushed += 1
-        }
+        val pendingPushed = 0
 
         val syncableMeasurements = measurementRepository.getSyncableMeasurements()
         var archivePushed = 0

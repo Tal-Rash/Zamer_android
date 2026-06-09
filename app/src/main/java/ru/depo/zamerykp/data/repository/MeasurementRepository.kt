@@ -121,11 +121,15 @@ class MeasurementRepository(
     }
 
     suspend fun markExported(id: String) {
-        measurementDao.updateSentStatus(id, SentStatus.EXPORTED, System.currentTimeMillis())
+        val session = getSession(id) ?: return
+        if (session.sentStatus != SentStatus.SENT) {
+            measurementDao.updateSentStatus(id, SentStatus.EXPORTED, System.currentTimeMillis())
+        }
     }
 
     suspend fun markSent(id: String) {
-        measurementDao.updateSentStatus(id, SentStatus.SENT, System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        measurementDao.updateSentStatusWithSyncTime(id, SentStatus.SENT, lastSyncedAt = now, updatedAt = now)
     }
 
     suspend fun deleteMeasurement(id: String): Boolean {
@@ -214,7 +218,7 @@ class MeasurementRepository(
                     source = MeasurementSource.IMPORTED,
                     archivePayload = archivePayload,
                     status = MeasurementStatus.FINISHED,
-                    sentStatus = SentStatus.NOT_SENT,
+                    sentStatus = SentStatus.SENT,
                     createdAt = now,
                     updatedAt = now,
                 )

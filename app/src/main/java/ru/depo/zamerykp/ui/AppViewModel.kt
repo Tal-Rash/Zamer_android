@@ -24,6 +24,7 @@ import ru.depo.zamerykp.domain.MeasurementExportDto
 import ru.depo.zamerykp.domain.VoiceCommand
 import ru.depo.zamerykp.domain.VoiceCommandParser
 import ru.depo.zamerykp.domain.VoiceParseResult
+import ru.depo.zamerykp.domain.MeasurementStatus
 import ru.depo.zamerykp.domain.WheelSide
 import ru.depo.zamerykp.domain.suggestedFileName
 import ru.depo.zamerykp.data.repository.ServerSyncRepository
@@ -78,6 +79,7 @@ data class ImportUiState(
 
 data class MeasurementUiState(
     val activeSessionId: String? = null,
+    val activeSessionStatus: MeasurementStatus = MeasurementStatus.DRAFT,
     val selectedLocomotiveId: Long? = null,
     val selectedWheelPair: Int = 1,
     val selectedSide: WheelSide = WheelSide.LEFT,
@@ -240,6 +242,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             val session = container.measurementRepository.getSession(id) ?: return@launch
             sessionState.value = sessionState.value.copy(
                 activeSessionId = session.id,
+                activeSessionStatus = session.status,
                 selectedLocomotiveId = session.locomotiveId,
                 selectedWheelPair = 1,
                 selectedSide = WheelSide.LEFT,
@@ -269,6 +272,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             )
             sessionState.value = sessionState.value.copy(
                 activeSessionId = id,
+                activeSessionStatus = MeasurementStatus.DRAFT,
                 voiceFlowState = VoiceFlowState.IDLE,
                 voiceFlowResumeState = null,
                 voiceMeasurementArmed = false,
@@ -288,6 +292,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             )
             sessionState.value = sessionState.value.copy(
                 activeSessionId = id,
+                activeSessionStatus = MeasurementStatus.DRAFT,
                 selectedWheelPair = 1,
                 selectedSide = WheelSide.LEFT,
                 voiceMeasurementArmed = false,
@@ -608,6 +613,9 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             announceVoiceWithResult(message)
             return
         }
+        val profile = activeProfiles.value.firstOrNull { it.number == targetPair }
+        val kc = if (side == WheelSide.LEFT) profile?.kcDiameterLeft else profile?.kcDiameterRight
+        val diameter = if (kc != null && command.bandageThickness != null) (kc + command.bandageThickness * 2).roundToInt().toDouble() else null
         viewModelScope.launch {
             container.measurementRepository.saveSideValue(
                 sessionId = sessionId,
@@ -617,7 +625,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 flangeWear = command.flangeWear,
                 flangeSteepness = command.flangeSteepness,
                 bandageThickness = command.bandageThickness,
-                bandageDiameter = null,
+                bandageDiameter = diameter,
             )
             sessionState.value = sessionState.value.copy(
                 selectedWheelPair = targetPair,
@@ -654,6 +662,9 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             announceVoiceWithResult(message)
             return
         }
+        val profile = activeProfiles.value.firstOrNull { it.number == state.selectedWheelPair }
+        val kc = if (state.selectedSide == WheelSide.LEFT) profile?.kcDiameterLeft else profile?.kcDiameterRight
+        val diameter = if (kc != null && bandageThickness != null) (kc + bandageThickness * 2).roundToInt().toDouble() else null
         viewModelScope.launch {
             container.measurementRepository.saveSideValue(
                 sessionId = sessionId,
@@ -663,7 +674,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 flangeWear = flangeWear,
                 flangeSteepness = flangeSteepness,
                 bandageThickness = bandageThickness,
-                bandageDiameter = null,
+                bandageDiameter = diameter,
             )
             sessionState.value = sessionState.value.copy(
                 lastValidationText = "",
@@ -756,6 +767,15 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    fun finishMeasurement(measurementId: String) {
+        viewModelScope.launch {
+            container.measurementRepository.finishSession(measurementId)
+            if (sessionState.value.activeSessionId == measurementId) {
+                sessionState.value = resetMeasurementState()
+            }
+        }
+    }
+
     fun requestExportShare() {
         val id = sessionState.value.activeSessionId ?: return
         requestExportShare(id)
@@ -764,7 +784,6 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun requestExportShare(measurementId: String) {
         viewModelScope.launch {
             if (measurementId == sessionState.value.activeSessionId) {
-                container.measurementRepository.finishSession(measurementId)
                 container.measurementRepository.markExported(measurementId)
             }
             val dto = container.exportRepository.buildExport(measurementId)
@@ -782,7 +801,6 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun completeExport() {
         val id = sessionState.value.activeSessionId ?: return
         viewModelScope.launch {
-            container.measurementRepository.finishSession(id)
             container.measurementRepository.markExported(id)
             sessionState.value = sessionState.value.copy(activeSessionId = null)
         }
@@ -822,7 +840,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 sessionState.value = sessionState.value.copy(
                     syncStatusMessage = buildString {
                         append("Синхронизация завершена. ")
-                        append("Отправлено: черновики ${result.pendingPushed}, замеры ${result.archivePushed}. ")
+                        append("Отправлено замеров: ${result.archivePushed}. ")
                         append("Получено: справочник ${result.referencePulled}, архив ${result.archivePulled}.")
                     }
                         .plus(
@@ -1077,6 +1095,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             val draft = container.measurementRepository.getLatestDraftSession() ?: return@launch
             sessionState.value = sessionState.value.copy(
                 activeSessionId = draft.id,
+                activeSessionStatus = draft.status,
                 selectedLocomotiveId = draft.locomotiveId,
                 measurementDate = draft.measurementDate,
                 repairType = draft.repairType,
@@ -1091,6 +1110,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             voiceFlowState = resumeState,
             voiceFlowResumeState = null,
             voiceMeasurementArmed = resumeState != VoiceFlowState.IDLE && resumeState != VoiceFlowState.SPEAKING,
+            voiceAnnouncement = "",
         )
     }
 

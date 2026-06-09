@@ -135,6 +135,8 @@ import ru.depo.zamerykp.data.db.WheelPairProfileEntity
 import ru.depo.zamerykp.data.db.WheelSideMeasurementEntity
 import ru.depo.zamerykp.ui.ImportPayloadKind
 import ru.depo.zamerykp.domain.MeasurementExportDto
+import ru.depo.zamerykp.domain.MeasurementStatus
+import ru.depo.zamerykp.domain.SentStatus
 import ru.depo.zamerykp.domain.VoiceCommand
 import ru.depo.zamerykp.domain.WheelSide
 import ru.depo.zamerykp.share.ShareManager
@@ -441,9 +443,31 @@ private fun LocomotivesScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center
                             )
+                            val hasDraft = measurementState.activeSessionId != null && measurementState.selectedLocomotiveId == locomotive.id
                             Text(
-                                text = latestArchive?.measurementDate?.displayDate() ?: "Нет замера",
+                                text = when {
+                                    hasDraft -> "Черновик"
+                                    latestArchive != null -> {
+                                        when (latestArchive.sentStatus) {
+                                            SentStatus.SENT -> "Синхронизирован"
+                                            SentStatus.EXPORTED -> "Экспортирован"
+                                            SentStatus.NOT_SENT -> "Готов"
+                                        }
+                                    }
+                                    else -> "Нет замера"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
+                                color = when {
+                                    hasDraft -> Color(0xFF7A7A7A)
+                                    latestArchive != null -> {
+                                        when (latestArchive.sentStatus) {
+                                            SentStatus.SENT -> Color(0xFF2E7D32)
+                                            SentStatus.EXPORTED -> Color(0xFF1976D2)
+                                            SentStatus.NOT_SENT -> Color(0xFFB26A00)
+                                        }
+                                    }
+                                    else -> Color(0xFF7A7A7A)
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center
                             )
@@ -650,13 +674,38 @@ private fun LocomotiveDetailScreen(
         else -> 0
     }.coerceIn(0, totalPairs)
     val statusText = when {
-        hasActiveDraft -> "Замер не завершен"
-        latestArchive != null -> "Последний замер сохранен"
+        hasActiveDraft -> "Черновик"
+        latestArchive != null -> {
+            when (latestArchive.sentStatus) {
+                SentStatus.SENT -> "Синхронизирован"
+                SentStatus.EXPORTED -> "Экспортирован"
+                SentStatus.NOT_SENT -> "Готов"
+            }
+        }
         else -> "Нет замеров"
     }
-    val isFull = filledPairs == totalPairs
-    val statusColor = if (isFull) Color(0xFFDFF3E0) else Color(0xFFFFE8C8)
-    val statusContentColor = if (isFull) Color(0xFF2E7D32) else Color(0xFFB26A00)
+    val statusColor = when {
+        hasActiveDraft -> Color(0xFFF0F0F0)
+        latestArchive != null -> {
+            when (latestArchive.sentStatus) {
+                SentStatus.SENT -> Color(0xFFDFF3E0)
+                SentStatus.EXPORTED -> Color(0xE3E2F2FE)
+                SentStatus.NOT_SENT -> Color(0xFFFFE8C8)
+            }
+        }
+        else -> Color(0xFFF5F5F5)
+    }
+    val statusContentColor = when {
+        hasActiveDraft -> Color(0xFF7A7A7A)
+        latestArchive != null -> {
+            when (latestArchive.sentStatus) {
+                SentStatus.SENT -> Color(0xFF2E7D32)
+                SentStatus.EXPORTED -> Color(0xFF1976D2)
+                SentStatus.NOT_SENT -> Color(0xFFB26A00)
+            }
+        }
+        else -> Color(0xFF7A7A7A)
+    }
     val progressText = "$filledPairs / $totalPairs"
 
     LazyColumn(
@@ -1030,6 +1079,20 @@ private fun MeasurementScreen(viewModel: AppViewModel, padding: PaddingValues, s
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(Modifier.width(2.dp))
                             Text("Новый замер", maxLines = 1, softWrap = false)
+                        }
+                    }
+                }
+                if (state.activeSessionStatus == MeasurementStatus.DRAFT) {
+                    item {
+                        Button(
+                            modifier = Modifier.fillMaxWidth().height(46.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            onClick = { viewModel.finishMeasurement(state.activeSessionId ?: "") }
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Завершить замер", maxLines = 1, softWrap = false)
                         }
                     }
                 }
@@ -1904,6 +1967,23 @@ private fun ArchiveLocomotivesScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center
                             )
+                            if (latest != null) {
+                                Text(
+                                    text = when (latest.sentStatus) {
+                                        SentStatus.SENT -> "Синхронизирован"
+                                        SentStatus.EXPORTED -> "Экспортирован"
+                                        SentStatus.NOT_SENT -> "Готов"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = when (latest.sentStatus) {
+                                        SentStatus.SENT -> Color(0xFF2E7D32)
+                                        SentStatus.EXPORTED -> Color(0xFF1976D2)
+                                        SentStatus.NOT_SENT -> Color(0xFFB26A00)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -2056,6 +2136,31 @@ private fun ArchiveMeasurementTablesScreen(
                                 softWrap = false,
                                 textAlign = TextAlign.Center
                             )
+                            Card(
+                                shape = MaterialTheme.shapes.small,
+                                colors = CardDefaults.cardColors(
+                                    containerColor = when (entry.item.sentStatus) {
+                                        SentStatus.SENT -> Color(0xFFDFF3E0)
+                                        SentStatus.EXPORTED -> Color(0xE3E2F2FE)
+                                        SentStatus.NOT_SENT -> Color(0xFFFFE8C8)
+                                    },
+                                    contentColor = when (entry.item.sentStatus) {
+                                        SentStatus.SENT -> Color(0xFF2E7D32)
+                                        SentStatus.EXPORTED -> Color(0xFF1976D2)
+                                        SentStatus.NOT_SENT -> Color(0xFFB26A00)
+                                    }
+                                )
+                            ) {
+                                Text(
+                                    text = when (entry.item.sentStatus) {
+                                        SentStatus.SENT -> "Синхронизирован"
+                                        SentStatus.EXPORTED -> "Экспортирован"
+                                        SentStatus.NOT_SENT -> "Готов"
+                                    },
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
                             if (entry.item.canDelete) {
                                 IconButton(
                                     modifier = Modifier.size(36.dp),

@@ -72,6 +72,7 @@ data class MeasurementSessionEntity(
     val sentStatus: SentStatus = SentStatus.NOT_SENT,
     val createdAt: Long,
     val updatedAt: Long,
+    val lastSyncedAt: Long = 0L,
 )
 
 @Entity(
