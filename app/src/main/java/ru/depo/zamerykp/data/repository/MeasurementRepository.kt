@@ -209,6 +209,9 @@ class MeasurementRepository(
 
         if (importArchive) {
             val now = System.currentTimeMillis()
+            if (archivePayload) {
+                measurementDao.deleteDuplicateLocalSessions(locomotive.id, dto.measurementDate, dto.repairType.trim())
+            }
             measurementDao.upsertSession(
                 MeasurementSessionEntity(
                     id = dto.measurementId,

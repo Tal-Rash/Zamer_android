@@ -266,6 +266,9 @@ interface MeasurementDao {
     @Query("DELETE FROM measurement_sessions WHERE id = :id")
     suspend fun deleteSession(id: String)
 
+    @Query("DELETE FROM measurement_sessions WHERE source = 'PHONE' AND status = 'FINISHED' AND sentStatus = 'SENT' AND locomotiveId = :locomotiveId AND measurementDate = :measurementDate AND repairType = :repairType")
+    suspend fun deleteDuplicateLocalSessions(locomotiveId: Long, measurementDate: String, repairType: String)
+
     @Query("DELETE FROM measurement_sessions WHERE archivePayload = 1")
     suspend fun deleteImportedArchiveSessions()
 
