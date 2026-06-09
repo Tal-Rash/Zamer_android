@@ -1960,7 +1960,7 @@ private fun ArchiveLocomotivesScreen(
                                 textAlign = TextAlign.Center
                             )
                             Text(
-                                text = latest?.measurementDate?.displayDate() ?: "Нет замера",
+                                text = latest?.measurementDate?.displayDate() ?: " ",
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center
@@ -1983,9 +1983,11 @@ private fun ArchiveLocomotivesScreen(
                                 )
                             } else {
                                 Text(
-                                    text = " ",
+                                    text = "Нет замера",
                                     style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.fillMaxWidth()
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
