@@ -1968,8 +1968,8 @@ private fun ArchiveLocomotivesScreen(
                             if (latest != null) {
                                 Text(
                                     text = when (latest.sentStatus) {
-                                        SentStatus.SENT -> "Синхронизирован"
-                                        SentStatus.EXPORTED -> "Экспортирован"
+                                        SentStatus.SENT -> "Синхр."
+                                        SentStatus.EXPORTED -> "Экспорт."
                                         SentStatus.NOT_SENT -> "Готов"
                                     },
                                     style = MaterialTheme.typography.bodySmall,
@@ -2157,8 +2157,8 @@ private fun ArchiveMeasurementTablesScreen(
                             ) {
                                 Text(
                                     text = when (entry.item.sentStatus) {
-                                        SentStatus.SENT -> "Синхронизирован"
-                                        SentStatus.EXPORTED -> "Экспортирован"
+                                        SentStatus.SENT -> "Синхр."
+                                        SentStatus.EXPORTED -> "Экспорт."
                                         SentStatus.NOT_SENT -> "Готов"
                                     },
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
