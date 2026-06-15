@@ -188,6 +188,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     fun selectLocomotive(id: Long?) {
         sessionState.value = sessionState.value.copy(selectedLocomotiveId = id)
+        refreshRepairDates(id)
     }
 
     fun refreshRepairDates(locomotiveId: Long?) {
@@ -915,6 +916,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                         ""
                     }
                 )
+                refreshRepairDates(sessionState.value.selectedLocomotiveId)
             } catch (error: Exception) {
                 sessionState.value = sessionState.value.copy(
                     syncStatusMessage = "Ошибка синхронизации: ${error.message ?: error}",
