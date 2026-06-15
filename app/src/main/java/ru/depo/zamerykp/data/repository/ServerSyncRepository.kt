@@ -361,11 +361,7 @@ class ServerSyncRepository(
             }
         }
 
-        fun pickDate(cellValue: String?, fallbackValue: String?): String? {
-            val cell = extractLatestDate(cellValue)
-            if (cell != null) return cell
-            return extractLatestDate(fallbackValue)
-        }
+        fun pickFactDate(cellValue: String?): String? = extractLatestDate(cellValue)
 
         val plan = row["plan"]?.jsonArray.orEmpty()
         val fact = row["fact"]?.jsonArray.orEmpty()
@@ -381,16 +377,12 @@ class ServerSyncRepository(
                 else -> code
             }
             val factValue = fact.getOrNull(index).stringOrNull()
-            val planValue = plan.getOrNull(index).stringOrNull()
-            putIfBlank(repairType, pickDate(factValue, planValue))
+            putIfBlank(repairType, pickFactDate(factValue))
         }
 
         val krObject = row["kr"]?.jsonObject
         if (krObject != null) {
-            pickDate(
-                krObject["fact"].stringOrNull(),
-                krObject["plan"].stringOrNull()
-            )?.let { result["КР"] = it }
+            pickFactDate(krObject["fact"].stringOrNull())?.let { result["КР"] = it }
         }
         return result
     }
@@ -414,9 +406,8 @@ private fun extractLatestDate(value: String?): String? {
 
 private fun kotlinx.serialization.json.JsonObject.latestRepairDateMillis(columns: kotlinx.serialization.json.JsonArray): Long {
     fun rowValueAt(index: Int): String? {
-        val plan = this["plan"]?.jsonArray?.getOrNull(index).stringOrNull()
         val fact = this["fact"]?.jsonArray?.getOrNull(index).stringOrNull()
-        return extractLatestDate(fact) ?: extractLatestDate(plan)
+        return extractLatestDate(fact)
     }
 
     var best = Long.MIN_VALUE
@@ -427,7 +418,7 @@ private fun kotlinx.serialization.json.JsonObject.latestRepairDateMillis(columns
         if (candidate > best) best = candidate
     }
     val krCandidate = this["kr"]?.jsonObject?.let { kr ->
-        extractLatestDate(kr["fact"].stringOrNull()) ?: extractLatestDate(kr["plan"].stringOrNull())
+        extractLatestDate(kr["fact"].stringOrNull())
     }?.toRepairDateMillis()
     if (krCandidate != null && krCandidate > best) best = krCandidate
     return best
