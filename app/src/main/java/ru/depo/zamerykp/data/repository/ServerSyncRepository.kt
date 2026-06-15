@@ -364,15 +364,14 @@ class ServerSyncRepository(
         fun pickGraphDate(cellValue: String?): String? =
             extractLatestDate(cellValue)
 
-        val plan = row["plan"]?.jsonArray.orEmpty()
         val fact = row["fact"]?.jsonArray.orEmpty()
         columns.forEachIndexed { index, column ->
             val code = column.jsonObject["code"].stringOrNull().orEmpty().trim().uppercase()
             if (code.isBlank()) return@forEachIndexed
             val repairType = when (code) {
-                "ТР1" -> "ТР-1"
-                "ТР2" -> "ТР-2"
-                "ТР3" -> "ТР-3"
+                "ТР1" -> "ТР1"
+                "ТР2" -> "ТР2"
+                "ТР3" -> "ТР3"
                 "СР" -> "СР"
                 "КР" -> "КР"
                 else -> code
