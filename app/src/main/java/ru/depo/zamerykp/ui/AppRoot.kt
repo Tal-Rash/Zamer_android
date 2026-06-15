@@ -648,7 +648,7 @@ private fun LocomotivesScreen(
                     } else {
                         // Заголовок
                         Text(
-                            text = "${dto.locomotive.series} ${dto.locomotive.number} • ${dto.measurementDate.displayDate()} • ${dto.repairType}",
+                            text = "${dto.locomotive.series} ${dto.locomotive.number} • ${dto.measurementDate.displayDate()} • ${dto.repairType.displayRepairType()}",
                             style = MaterialTheme.typography.titleSmall,
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center,
@@ -1498,7 +1498,7 @@ private fun MeasurementTopCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "$measurementDate  $repairType",
+                    text = "$measurementDate  ${repairType.displayRepairType()}",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontSize = MaterialTheme.typography.titleMedium.fontSize * 0.8f
                     ),
@@ -2229,7 +2229,7 @@ private fun ArchiveMeasurementTablesScreen(
                             }
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "${dto.measurementDate.displayDate()} • ${dto.repairType} • ${dto.locomotive.series} ${dto.locomotive.number}",
+                            text = "${dto.measurementDate.displayDate()} • ${dto.repairType.displayRepairType()} • ${dto.locomotive.series} ${dto.locomotive.number}",
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.titleSmall,
                                 maxLines = 1,
@@ -2403,7 +2403,7 @@ private fun MeasurementArchiveDetailScreen(
                                     softWrap = false
                                 )
                                 Text(
-                                    text = dto.repairType,
+                                    text = dto.repairType.displayRepairType(),
                                     style = MaterialTheme.typography.bodySmall,
                                     maxLines = 1,
                                     softWrap = false
@@ -2434,7 +2434,7 @@ private fun MeasurementArchiveDetailScreen(
                                     softWrap = false
                                 )
                                 Text(
-                                    text = dto.repairType,
+                                    text = dto.repairType.displayRepairType(),
                                     style = MaterialTheme.typography.titleSmall,
                                     maxLines = 1,
                                     softWrap = false
@@ -3110,7 +3110,7 @@ private fun DraftsScreen(
                         onClick = { onOpenDraft(draft.measurementId) }
                     ) {
                         Text(
-                            "${draft.series} ${draft.number} • ${draft.measurementDate.displayDate()} • ${draft.repairType}",
+                            "${draft.series} ${draft.number} • ${draft.measurementDate.displayDate()} • ${draft.repairType.displayRepairType()}",
                             maxLines = 1,
                             softWrap = false
                         )
@@ -3366,13 +3366,20 @@ private fun List<ru.depo.zamerykp.domain.ArchiveItem>.firstRepairDate(type: Stri
         ?.displayDate()
 
 private fun String.normalizeRepairType(): String =
-    uppercase().replace('–', '-').replace('—', '-').replace(" ", "")
+    uppercase()
+        .replace('–', '-')
+        .replace('—', '-')
+        .replace("-", "")
+        .replace(" ", "")
+
+private fun String.displayRepairType(): String =
+    replace("-", "")
 
 private fun repairTypesFor(locomotive: LocomotiveEntity?): List<String> {
     val seriesKey = locomotive?.series?.seriesKey().orEmpty()
     return when {
         seriesKey.startsWith("ПЭ2М") -> listOf("ТО", "ТР")
-        seriesKey.startsWith("ТЭМ") -> listOf("ТО-2", "ТО-3", "ТР-1", "ТР-2", "ТР-3", "СР", "КР", "ТО-4")
+        seriesKey.startsWith("ТЭМ") -> listOf("ТО2", "ТО3", "ТР1", "ТР2", "ТР3", "СР", "КР", "ТО4")
         else -> emptyList()
     }
 }

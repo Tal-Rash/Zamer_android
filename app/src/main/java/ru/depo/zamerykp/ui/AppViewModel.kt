@@ -88,7 +88,7 @@ data class MeasurementUiState(
     val selectedSide: WheelSide = WheelSide.LEFT,
     val inputMode: MeasurementInputMode = MeasurementInputMode.MANUAL,
     val measurementDate: String = LocalDate.now().toString(),
-    val repairType: String = "ТО-3",
+    val repairType: String = "ТО3",
     val sides: List<WheelSideMeasurementEntity> = emptyList(),
     val selectedArchiveMeasurementId: String? = null,
     val selectedArchiveMeasurement: MeasurementExportDto? = null,
@@ -217,7 +217,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                     number = locomotive.number,
                 )
             }.getOrDefault(emptyMap())
-            val repairTypes = listOf("ТО-3", "ТР-1", "ТР-2", "ТР-3", "СР", "КР")
+            val repairTypes = listOf("ТО3", "ТР1", "ТР2", "ТР3", "СР", "КР")
             repairDatesState.value = repairTypes.map { repairType ->
                 val archiveDate = archiveMap[repairType.normalizeRepairType()]
                 val graphDate = graphMap[repairType.normalizeRepairType()]
@@ -1219,6 +1219,7 @@ private fun String.normalizeRepairType(): String =
     uppercase()
         .replace('–', '-')
         .replace('—', '-')
+        .replace("-", "")
         .replace(" ", "")
 
 class AppViewModelFactory(private val container: AppContainer) : ViewModelProvider.Factory {
