@@ -203,8 +203,12 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         repairDatesJob = viewModelScope.launch {
             val archiveMap = archive.value
                 .filter { it.locomotiveTitle == "${locomotive.series} ${locomotive.number}" }
-                .associateBy { it.repairType.normalizeRepairType() }
-                .mapValues { (_, item) -> item.measurementDate.displayDate() }
+                .groupBy { it.repairType.normalizeRepairType() }
+                .mapValues { (_, items) ->
+                    items.maxByOrNull { it.measurementDate.toIsoDateMillis() ?: Long.MIN_VALUE }
+                        ?.measurementDate
+                        ?.displayDate()
+                }
             val graphMap = runCatching {
                 container.serverSyncRepository.fetchRepairScheduleDates(
                     serverBaseUrl = settings.value.syncServerUrl,
@@ -1202,6 +1206,14 @@ private fun String.displayDate(): String =
     runCatching {
         LocalDate.parse(this).format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
     }.getOrDefault(this)
+
+private fun String.toIsoDateMillis(): Long? =
+    runCatching {
+        LocalDate.parse(this)
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+    }.getOrNull()
 
 private fun String.normalizeRepairType(): String =
     uppercase()

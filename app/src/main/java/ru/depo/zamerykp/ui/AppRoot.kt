@@ -814,15 +814,16 @@ private fun LocomotiveDetailScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(repairDate.repairType)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (!repairDate.sourceLabel.isNullOrBlank()) {
                                     Text(
                                         repairDate.sourceLabel,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(end = 6.dp)
                                     )
                                 }
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
                                 Text(repairDate.date ?: "-")
                             }
                         }
