@@ -345,11 +345,13 @@ class ServerSyncRepository(
         val objects = schedule["objects"]?.jsonArray ?: return emptyMap()
         val targetSeries = series.trim().uppercase()
         val targetNumber = number.trim()
-        val row = objects.firstOrNull { item ->
+        val columns = schedule["columns"]?.jsonArray.orEmpty()
+        val row = objects.mapNotNull { item ->
             val obj = item.jsonObject
-            obj["series"].stringOrNull()?.trim()?.uppercase() == targetSeries &&
-                obj["number"].stringOrNull()?.trim() == targetNumber
-        }?.jsonObject ?: return emptyMap()
+            val objSeries = obj["series"].stringOrNull()?.trim()?.uppercase()
+            val objNumber = obj["number"].stringOrNull()?.trim()
+            if (objSeries == targetSeries && objNumber == targetNumber) obj else null
+        }.maxByOrNull { candidate -> candidate.latestRepairDateMillis(columns) } ?: return emptyMap()
 
         val result = linkedMapOf<String, String>()
         fun putIfBlank(type: String, value: String?) {
@@ -360,13 +362,11 @@ class ServerSyncRepository(
         }
 
         fun pickDate(cellValue: String?, fallbackValue: String?): String? {
-            val cell = cellValue?.trim().orEmpty()
-            if (cell.isNotBlank()) return cell
-            val fallback = fallbackValue?.trim().orEmpty()
-            return fallback.ifBlank { null }
+            val cell = extractLatestDate(cellValue)
+            if (cell != null) return cell
+            return extractLatestDate(fallbackValue)
         }
 
-        val columns = schedule["columns"]?.jsonArray.orEmpty()
         val plan = row["plan"]?.jsonArray.orEmpty()
         val fact = row["fact"]?.jsonArray.orEmpty()
         columns.forEachIndexed { index, column ->
@@ -401,6 +401,47 @@ private fun kotlinx.serialization.json.JsonArray?.orEmpty(): kotlinx.serializati
 
 private fun kotlinx.serialization.json.JsonElement?.stringOrNull(): String? =
     runCatching { this?.jsonPrimitive?.content }.getOrNull()
+
+private fun extractLatestDate(value: String?): String? {
+    val text = value?.trim().orEmpty()
+    if (text.isBlank()) return null
+    val matches = DATE_PATTERN.findAll(text).map { it.value }.toList()
+    return when {
+        matches.isNotEmpty() -> matches.last()
+        else -> text
+    }
+}
+
+private fun kotlinx.serialization.json.JsonObject.latestRepairDateMillis(columns: kotlinx.serialization.json.JsonArray): Long {
+    fun rowValueAt(index: Int): String? {
+        val plan = this["plan"]?.jsonArray?.getOrNull(index).stringOrNull()
+        val fact = this["fact"]?.jsonArray?.getOrNull(index).stringOrNull()
+        return extractLatestDate(fact) ?: extractLatestDate(plan)
+    }
+
+    var best = Long.MIN_VALUE
+    columns.forEachIndexed { index, column ->
+        val code = column.jsonObject["code"].stringOrNull().orEmpty().trim().uppercase()
+        if (code.isBlank()) return@forEachIndexed
+        val candidate = rowValueAt(index)?.toRepairDateMillis() ?: return@forEachIndexed
+        if (candidate > best) best = candidate
+    }
+    val krCandidate = this["kr"]?.jsonObject?.let { kr ->
+        extractLatestDate(kr["fact"].stringOrNull()) ?: extractLatestDate(kr["plan"].stringOrNull())
+    }?.toRepairDateMillis()
+    if (krCandidate != null && krCandidate > best) best = krCandidate
+    return best
+}
+
+private fun String.toRepairDateMillis(): Long? =
+    runCatching {
+        LocalDate.parse(this, java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+            .atStartOfDay(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+    }.getOrNull()
+
+private val DATE_PATTERN = Regex("""\d{2}\.\d{2}\.\d{4}""")
 
 private fun ReferenceLocomotiveExportDto.referenceKey(): String =
     "${series.trim().uppercase()}|${number.trim()}"
