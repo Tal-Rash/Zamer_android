@@ -4,10 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -132,7 +133,6 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val parser = VoiceCommandParser()
     private var pendingImport: ru.depo.zamerykp.domain.ImportEnvelope? = null
     private var voiceAnnouncementToken = 0L
-    private var repairDatesJob: Job? = null
 
     init {
         restoreLatestDraft()
@@ -155,9 +155,30 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettingsEntity())
 
     private val sessionState = kotlinx.coroutines.flow.MutableStateFlow(MeasurementUiState())
-    private val repairDatesState = MutableStateFlow<List<RepairDateItem>>(emptyList())
+    private val repairDatesLocomotiveId = MutableStateFlow<Long?>(null)
+    private data class RepairDatesSnapshot(
+        val locomotiveId: Long?,
+        val locomotives: List<LocomotiveEntity>,
+        val archive: List<ArchiveItem>,
+        val settings: AppSettingsEntity,
+    )
 
-    val repairDates: StateFlow<List<RepairDateItem>> = repairDatesState
+    val repairDates: StateFlow<List<RepairDateItem>> =
+        combine(repairDatesLocomotiveId, locomotives, archive, settings) { locomotiveId, locomotives, archive, settings ->
+            RepairDatesSnapshot(locomotiveId, locomotives, archive, settings)
+        }.flatMapLatest { snapshot ->
+            flow {
+                emit(
+                    buildRepairDates(
+                        locomotiveId = snapshot.locomotiveId,
+                        locomotivesSnapshot = snapshot.locomotives,
+                        archiveSnapshot = snapshot.archive,
+                        settingsSnapshot = snapshot.settings,
+                        serverSyncRepository = container.serverSyncRepository,
+                    )
+                )
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val measurementState: StateFlow<MeasurementUiState> =
         sessionState.flatMapLatest { state ->
@@ -188,55 +209,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     fun selectLocomotive(id: Long?) {
         sessionState.value = sessionState.value.copy(selectedLocomotiveId = id)
-        refreshRepairDates(id)
+        repairDatesLocomotiveId.value = id
     }
 
     fun refreshRepairDates(locomotiveId: Long?) {
-        repairDatesJob?.cancel()
-        if (locomotiveId == null) {
-            repairDatesState.value = emptyList()
-            return
-        }
-        val locomotive = locomotives.value.firstOrNull { it.id == locomotiveId } ?: run {
-            repairDatesState.value = emptyList()
-            return
-        }
-        repairDatesJob = viewModelScope.launch {
-            val archiveMap = archive.value
-                .filter { it.locomotiveTitle == "${locomotive.series} ${locomotive.number}" }
-                .groupBy { it.repairType.normalizeRepairType() }
-                .mapValues { (_, items) ->
-                    items.maxByOrNull { it.measurementDate.toIsoDateMillis() ?: Long.MIN_VALUE }
-                        ?.measurementDate
-                        ?.displayDate()
-                }
-            val graphMap = runCatching {
-                container.serverSyncRepository.fetchRepairScheduleDates(
-                    serverBaseUrl = settings.value.syncServerUrl,
-                    password = settings.value.syncPassword,
-                    series = locomotive.series,
-                    number = locomotive.number,
-                )
-            }.getOrDefault(emptyMap())
-            val repairTypes = listOf("ТО3", "ТР1", "ТР2", "ТР3", "СР", "КР")
-            repairDatesState.value = repairTypes.map { repairType ->
-                val archiveDate = archiveMap[repairType.normalizeRepairType()]
-                val graphDate = graphMap[repairType.normalizeRepairType()]
-                when {
-                    !archiveDate.isNullOrBlank() -> RepairDateItem(
-                        repairType = repairType,
-                        date = archiveDate,
-                        sourceLabel = "КП",
-                    )
-                    !graphDate.isNullOrBlank() -> RepairDateItem(
-                        repairType = repairType,
-                        date = graphDate,
-                        sourceLabel = "График",
-                    )
-                    else -> RepairDateItem(repairType = repairType)
-                }
-            }
-        }
+        repairDatesLocomotiveId.value = locomotiveId
     }
 
     fun updateRepairType(value: String) {
@@ -916,7 +893,6 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                         ""
                     }
                 )
-                refreshRepairDates(sessionState.value.selectedLocomotiveId)
             } catch (error: Exception) {
                 sessionState.value = sessionState.value.copy(
                     syncStatusMessage = "Ошибка синхронизации: ${error.message ?: error}",
@@ -1203,6 +1179,51 @@ private fun Long.toSyncTime(): String =
             .toLocalDateTime()
             .toString()
     }
+
+private suspend fun buildRepairDates(
+    locomotiveId: Long?,
+    locomotivesSnapshot: List<LocomotiveEntity>,
+    archiveSnapshot: List<ArchiveItem>,
+    settingsSnapshot: AppSettingsEntity,
+    serverSyncRepository: ServerSyncRepository,
+): List<RepairDateItem> {
+    if (locomotiveId == null) return emptyList()
+    val locomotive = locomotivesSnapshot.firstOrNull { it.id == locomotiveId } ?: return emptyList()
+    val archiveMap = archiveSnapshot
+        .filter { it.locomotiveTitle == "${locomotive.series} ${locomotive.number}" }
+        .groupBy { it.repairType.normalizeRepairType() }
+        .mapValues { (_, items) ->
+            items.maxByOrNull { it.measurementDate.toIsoDateMillis() ?: Long.MIN_VALUE }
+                ?.measurementDate
+                ?.displayDate()
+        }
+    val graphMap = runCatching {
+        serverSyncRepository.fetchRepairScheduleDates(
+            serverBaseUrl = settingsSnapshot.syncServerUrl,
+            password = settingsSnapshot.syncPassword,
+            series = locomotive.series,
+            number = locomotive.number,
+        )
+    }.getOrDefault(emptyMap())
+    val repairTypes = listOf("ТО3", "ТР1", "ТР2", "ТР3", "СР", "КР")
+    return repairTypes.map { repairType ->
+        val archiveDate = archiveMap[repairType.normalizeRepairType()]
+        val graphDate = graphMap[repairType.normalizeRepairType()]
+        when {
+            !archiveDate.isNullOrBlank() -> RepairDateItem(
+                repairType = repairType,
+                date = archiveDate,
+                sourceLabel = "КП",
+            )
+            !graphDate.isNullOrBlank() -> RepairDateItem(
+                repairType = repairType,
+                date = graphDate,
+                sourceLabel = "График",
+            )
+            else -> RepairDateItem(repairType = repairType)
+        }
+    }
+}
 
 private fun String.displayDate(): String =
     runCatching {
