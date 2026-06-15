@@ -56,3 +56,9 @@ data class ArchiveItem(
     val source: MeasurementSource,
     val canDelete: Boolean,
 )
+
+data class RepairDateItem(
+    val repairType: String,
+    val date: String? = null,
+    val sourceLabel: String? = null,
+)

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -21,6 +23,7 @@ import ru.depo.zamerykp.domain.ArchiveItem
 import ru.depo.zamerykp.domain.ImportPayload
 import ru.depo.zamerykp.domain.MeasurementField
 import ru.depo.zamerykp.domain.MeasurementExportDto
+import ru.depo.zamerykp.domain.RepairDateItem
 import ru.depo.zamerykp.domain.VoiceCommand
 import ru.depo.zamerykp.domain.VoiceCommandParser
 import ru.depo.zamerykp.domain.VoiceParseResult
@@ -129,6 +132,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val parser = VoiceCommandParser()
     private var pendingImport: ru.depo.zamerykp.domain.ImportEnvelope? = null
     private var voiceAnnouncementToken = 0L
+    private var repairDatesJob: Job? = null
 
     init {
         restoreLatestDraft()
@@ -151,6 +155,9 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettingsEntity())
 
     private val sessionState = kotlinx.coroutines.flow.MutableStateFlow(MeasurementUiState())
+    private val repairDatesState = MutableStateFlow<List<RepairDateItem>>(emptyList())
+
+    val repairDates: StateFlow<List<RepairDateItem>> = repairDatesState
 
     val measurementState: StateFlow<MeasurementUiState> =
         sessionState.flatMapLatest { state ->
@@ -181,6 +188,50 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     fun selectLocomotive(id: Long?) {
         sessionState.value = sessionState.value.copy(selectedLocomotiveId = id)
+    }
+
+    fun refreshRepairDates(locomotiveId: Long?) {
+        repairDatesJob?.cancel()
+        if (locomotiveId == null) {
+            repairDatesState.value = emptyList()
+            return
+        }
+        val locomotive = locomotives.value.firstOrNull { it.id == locomotiveId } ?: run {
+            repairDatesState.value = emptyList()
+            return
+        }
+        repairDatesJob = viewModelScope.launch {
+            val archiveMap = archive.value
+                .filter { it.locomotiveTitle == "${locomotive.series} ${locomotive.number}" }
+                .associateBy { it.repairType.normalizeRepairType() }
+                .mapValues { (_, item) -> item.measurementDate.displayDate() }
+            val graphMap = runCatching {
+                container.serverSyncRepository.fetchRepairScheduleDates(
+                    serverBaseUrl = settings.value.syncServerUrl,
+                    password = settings.value.syncPassword,
+                    series = locomotive.series,
+                    number = locomotive.number,
+                )
+            }.getOrDefault(emptyMap())
+            val repairTypes = listOf("ТО-3", "ТР-1", "ТР-2", "ТР-3", "СР", "КР")
+            repairDatesState.value = repairTypes.map { repairType ->
+                val archiveDate = archiveMap[repairType.normalizeRepairType()]
+                val graphDate = graphMap[repairType.normalizeRepairType()]
+                when {
+                    !archiveDate.isNullOrBlank() -> RepairDateItem(
+                        repairType = repairType,
+                        date = archiveDate,
+                        sourceLabel = "КП",
+                    )
+                    !graphDate.isNullOrBlank() -> RepairDateItem(
+                        repairType = repairType,
+                        date = graphDate,
+                        sourceLabel = "График",
+                    )
+                    else -> RepairDateItem(repairType = repairType)
+                }
+            }
+        }
     }
 
     fun updateRepairType(value: String) {
@@ -1146,6 +1197,17 @@ private fun Long.toSyncTime(): String =
             .toLocalDateTime()
             .toString()
     }
+
+private fun String.displayDate(): String =
+    runCatching {
+        LocalDate.parse(this).format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+    }.getOrDefault(this)
+
+private fun String.normalizeRepairType(): String =
+    uppercase()
+        .replace('–', '-')
+        .replace('—', '-')
+        .replace(" ", "")
 
 class AppViewModelFactory(private val container: AppContainer) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")

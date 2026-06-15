@@ -4,10 +4,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import ru.depo.zamerykp.domain.ImportPayload
 import ru.depo.zamerykp.domain.ReferenceDataExportDto
 import ru.depo.zamerykp.domain.ReferenceLocomotiveExportDto
 import ru.depo.zamerykp.domain.MeasurementStatus
+import java.time.LocalDate
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -208,6 +212,22 @@ class ServerSyncRepository(
         referenceDto.locomotives.size
     }
 
+    suspend fun fetchRepairScheduleDates(
+        serverBaseUrl: String,
+        password: String,
+        series: String,
+        number: String,
+        year: Int = LocalDate.now().year,
+    ): Map<String, String> = withContext(Dispatchers.IO) {
+        val baseUrl = normalizeBaseUrl(serverBaseUrl)
+        if (baseUrl.isBlank() || password.isBlank()) return@withContext emptyMap()
+        runCatching {
+            val cookie = login(baseUrl, password)
+            val text = getText("$baseUrl/grafik-ppr/api/state?year=$year", cookie)
+            parseRepairScheduleDates(text, series, number)
+        }.getOrDefault(emptyMap())
+    }
+
     private fun normalizeBaseUrl(value: String): String =
         value.trim()
             .trimEnd('/')
@@ -314,7 +334,73 @@ class ServerSyncRepository(
         }
         return text
     }
+
+    private fun parseRepairScheduleDates(
+        text: String,
+        series: String,
+        number: String,
+    ): Map<String, String> {
+        val root = json.parseToJsonElement(text).jsonObject
+        val schedule = root["repair_schedule"]?.jsonObject ?: return emptyMap()
+        val objects = schedule["objects"]?.jsonArray ?: return emptyMap()
+        val targetSeries = series.trim().uppercase()
+        val targetNumber = number.trim()
+        val row = objects.firstOrNull { item ->
+            val obj = item.jsonObject
+            obj["series"].stringOrNull()?.trim()?.uppercase() == targetSeries &&
+                obj["number"].stringOrNull()?.trim() == targetNumber
+        }?.jsonObject ?: return emptyMap()
+
+        val result = linkedMapOf<String, String>()
+        fun putIfBlank(type: String, value: String?) {
+            val textValue = value?.trim().orEmpty()
+            if (textValue.isNotBlank() && result[type].isNullOrBlank()) {
+                result[type] = textValue
+            }
+        }
+
+        fun pickDate(cellValue: String?, fallbackValue: String?): String? {
+            val cell = cellValue?.trim().orEmpty()
+            if (cell.isNotBlank()) return cell
+            val fallback = fallbackValue?.trim().orEmpty()
+            return fallback.ifBlank { null }
+        }
+
+        val columns = schedule["columns"]?.jsonArray.orEmpty()
+        val plan = row["plan"]?.jsonArray.orEmpty()
+        val fact = row["fact"]?.jsonArray.orEmpty()
+        columns.forEachIndexed { index, column ->
+            val code = column.jsonObject["code"].stringOrNull().orEmpty().trim().uppercase()
+            if (code.isBlank()) return@forEachIndexed
+            val repairType = when (code) {
+                "ТР1" -> "ТР-1"
+                "ТР2" -> "ТР-2"
+                "ТР3" -> "ТР-3"
+                "СР" -> "СР"
+                "КР" -> "КР"
+                else -> code
+            }
+            val factValue = fact.getOrNull(index).stringOrNull()
+            val planValue = plan.getOrNull(index).stringOrNull()
+            putIfBlank(repairType, pickDate(factValue, planValue))
+        }
+
+        val krObject = row["kr"]?.jsonObject
+        if (krObject != null) {
+            pickDate(
+                krObject["fact"].stringOrNull(),
+                krObject["plan"].stringOrNull()
+            )?.let { result["КР"] = it }
+        }
+        return result
+    }
 }
+
+private fun kotlinx.serialization.json.JsonArray?.orEmpty(): kotlinx.serialization.json.JsonArray =
+    this ?: kotlinx.serialization.json.JsonArray(emptyList())
+
+private fun kotlinx.serialization.json.JsonElement?.stringOrNull(): String? =
+    runCatching { this?.jsonPrimitive?.content }.getOrNull()
 
 private fun ReferenceLocomotiveExportDto.referenceKey(): String =
     "${series.trim().uppercase()}|${number.trim()}"

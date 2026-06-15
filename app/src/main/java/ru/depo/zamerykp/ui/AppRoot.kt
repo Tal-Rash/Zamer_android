@@ -131,6 +131,7 @@ import kotlinx.coroutines.launch
 import ru.depo.zamerykp.data.db.LocomotiveEntity
 import ru.depo.zamerykp.R
 import ru.depo.zamerykp.domain.ArchiveItem
+import ru.depo.zamerykp.domain.RepairDateItem
 import ru.depo.zamerykp.data.db.WheelPairProfileEntity
 import ru.depo.zamerykp.data.db.WheelSideMeasurementEntity
 import ru.depo.zamerykp.ui.ImportPayloadKind
@@ -340,6 +341,8 @@ private fun LocomotivesScreen(
     val selectedId = measurementState.selectedLocomotiveId
     val profiles by viewModel.activeProfiles.collectAsState()
     val archive by viewModel.archive.collectAsState()
+    val settings by viewModel.settings.collectAsState()
+    val repairDates by viewModel.repairDates.collectAsState()
     val selectedLocomotive = locomotives.firstOrNull { it.id == selectedId }
     val sortedLocomotives = locomotives.sortedBy { it.sortOrder }
     var series by remember { mutableStateOf("") }
@@ -360,14 +363,9 @@ private fun LocomotivesScreen(
         archive.filter { it.locomotiveTitle == "${locomotive.series} ${locomotive.number}" }
     }.orEmpty()
     val latestArchive = locomotiveArchive.maxByOrNull { it.measurementDate.toIsoDateMillis() ?: Long.MIN_VALUE }
-    val repairDates = linkedMapOf(
-        "ТО-3" to locomotiveArchive.firstRepairDate("ТО-3"),
-        "ТР-1" to locomotiveArchive.firstRepairDate("ТР-1"),
-        "ТР-2" to locomotiveArchive.firstRepairDate("ТР-2"),
-        "ТР-3" to locomotiveArchive.firstRepairDate("ТР-3"),
-        "СР" to locomotiveArchive.firstRepairDate("СР"),
-        "КР" to locomotiveArchive.firstRepairDate("КР"),
-    )
+    LaunchedEffect(detailLocomotiveId, archive, settings.syncServerUrl, settings.syncPassword) {
+        viewModel.refreshRepairDates(detailLocomotiveId)
+    }
     BackHandler(enabled = showKpDialog) {
         showKpDialog = false
     }
@@ -726,7 +724,7 @@ private fun LocomotiveDetailScreen(
     locomotive: LocomotiveEntity,
     profiles: List<WheelPairProfileEntity>,
     latestArchive: ru.depo.zamerykp.domain.ArchiveItem?,
-    repairDates: Map<String, String?>,
+    repairDates: List<RepairDateItem>,
     hasActiveDraft: Boolean,
     currentDraftFilledPairs: Int,
     onBack: () -> Unit,
@@ -808,13 +806,25 @@ private fun LocomotiveDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
-                    repairDates.entries.forEachIndexed { index, (repair, date) ->
+                    repairDates.forEachIndexed { index, repairDate ->
                         Row(
                             Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
                         ) {
-                            Text(repair)
-                            Text(date ?: "-")
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(repairDate.repairType)
+                                if (!repairDate.sourceLabel.isNullOrBlank()) {
+                                    Text(
+                                        repairDate.sourceLabel,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(repairDate.date ?: "-")
+                            }
                         }
                         if (index != repairDates.size - 1) {
                             Divider(
