@@ -361,7 +361,8 @@ class ServerSyncRepository(
             }
         }
 
-        fun pickFactDate(cellValue: String?): String? = extractLatestDate(cellValue)
+        fun pickGraphDate(cellValue: String?): String? =
+            extractLatestDate(cellValue)
 
         val plan = row["plan"]?.jsonArray.orEmpty()
         val fact = row["fact"]?.jsonArray.orEmpty()
@@ -377,12 +378,12 @@ class ServerSyncRepository(
                 else -> code
             }
             val factValue = fact.getOrNull(index).stringOrNull()
-            putIfBlank(repairType, pickFactDate(factValue))
+            putIfBlank(repairType, pickGraphDate(factValue))
         }
 
         val krObject = row["kr"]?.jsonObject
         if (krObject != null) {
-            pickFactDate(krObject["fact"].stringOrNull())?.let { result["КР"] = it }
+            pickGraphDate(krObject["fact"].stringOrNull())?.let { result["КР"] = it }
         }
         return result
     }
