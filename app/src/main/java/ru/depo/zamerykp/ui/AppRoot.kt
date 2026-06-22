@@ -659,6 +659,7 @@ private fun LocomotivesScreen(
                         Text("Инв. №: ${locomotiveInfo?.inventoryNumber?.ifBlank { "—" } ?: "—"}")
                         Text("Восьмизначный номер: ${locomotiveInfo?.eightDigitNumber?.ifBlank { "—" } ?: "—"}")
                         Text("Год постройки: ${locomotiveInfo?.manufactureYear?.ifBlank { "—" } ?: "—"}")
+                        Text("Срок службы: ${locomotiveInfo?.serviceLife?.ifBlank { "—" } ?: "—"}")
                     }
                 }
             },

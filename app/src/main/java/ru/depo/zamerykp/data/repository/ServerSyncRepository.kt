@@ -38,6 +38,7 @@ data class LocomotiveServerInfo(
     val inventoryNumber: String,
     val eightDigitNumber: String,
     val manufactureYear: String,
+    val serviceLife: String,
 )
 
 class ServerSyncRepository(
@@ -253,6 +254,9 @@ class ServerSyncRepository(
             ),
             manufactureYear = item.valueFor(
                 "manufactureYear", "manufacture_year", "yearBuilt", "buildYear", "constructionYear", "годПостройки",
+            ),
+            serviceLife = item.valueFor(
+                "serviceLife", "service_life", "serviceLifetime", "service_lifetime", "serviceTerm", "service_term", "срокСлужбы", "срок_службы",
             ),
         )
     }
