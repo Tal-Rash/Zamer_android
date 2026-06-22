@@ -34,6 +34,12 @@ data class ReferenceSyncConflict(
     val reason: String,
 )
 
+data class LocomotiveServerInfo(
+    val inventoryNumber: String,
+    val eightDigitNumber: String,
+    val manufactureYear: String,
+)
+
 class ServerSyncRepository(
     private val exportRepository: ExportRepository,
     private val measurementRepository: MeasurementRepository,
@@ -210,6 +216,45 @@ class ServerSyncRepository(
         if (referenceDto.locomotives.isEmpty()) return@withContext 0
         postJson("$baseUrl/zamer-kp/api/phone-import", cookie, json.encodeToString(referenceDto))
         referenceDto.locomotives.size
+    }
+
+    suspend fun fetchLocomotiveInfo(
+        serverBaseUrl: String,
+        password: String,
+        series: String,
+        number: String,
+    ): LocomotiveServerInfo? = withContext(Dispatchers.IO) {
+        val baseUrl = normalizeBaseUrl(serverBaseUrl)
+        require(baseUrl.isNotBlank()) { "В настройках не указан адрес сервера." }
+        require(password.isNotBlank()) { "В настройках не указан пароль сервера." }
+
+        val cookie = login(baseUrl, password)
+        val text = getText("$baseUrl/zamer-kp/api/phone-export?kind=reference&format=json", cookie)
+        val root = json.parseToJsonElement(text).jsonObject
+        val locomotives = root["locomotives"]?.jsonArray.orEmpty()
+        val targetSeries = series.trim().uppercase()
+        val targetNumber = number.trim()
+        val item = locomotives
+            .mapNotNull { runCatching { it.jsonObject }.getOrNull() }
+            .firstOrNull { locomotive ->
+                locomotive.valueFor("series").uppercase() == targetSeries &&
+                    locomotive.valueFor("number") == targetNumber
+            }
+            ?: return@withContext null
+
+        LocomotiveServerInfo(
+            inventoryNumber = item.valueFor(
+                "inventoryNumber", "inventory_number", "invNumber", "inv_number",
+                "inventory", "инвНомер", "инв_номер",
+            ),
+            eightDigitNumber = item.valueFor(
+                "eightDigitNumber", "eight_digit_number", "eightNumber", "eight_number",
+                "uicNumber", "uic_number", "восьмизначныйНомер", "восьмизначный_номер",
+            ),
+            manufactureYear = item.valueFor(
+                "manufactureYear", "manufacture_year", "yearBuilt", "buildYear", "constructionYear", "годПостройки",
+            ),
+        )
     }
 
     suspend fun fetchRepairScheduleDates(
@@ -393,6 +438,9 @@ private fun kotlinx.serialization.json.JsonArray?.orEmpty(): kotlinx.serializati
 
 private fun kotlinx.serialization.json.JsonElement?.stringOrNull(): String? =
     runCatching { this?.jsonPrimitive?.content }.getOrNull()
+
+private fun kotlinx.serialization.json.JsonObject.valueFor(vararg keys: String): String =
+    keys.firstNotNullOfOrNull { key -> this[key].stringOrNull()?.trim()?.takeIf(String::isNotBlank) }.orEmpty()
 
 private fun extractLatestDate(value: String?): String? {
     val text = value?.trim().orEmpty()

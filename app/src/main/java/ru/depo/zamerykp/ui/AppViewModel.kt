@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.depo.zamerykp.AppContainer
 import ru.depo.zamerykp.data.db.LocomotiveEntity
+import ru.depo.zamerykp.data.repository.LocomotiveServerInfo
 import ru.depo.zamerykp.data.db.AppSettingsEntity
 import ru.depo.zamerykp.data.db.WheelPairProfileEntity
 import ru.depo.zamerykp.data.db.WheelSideMeasurementEntity
@@ -899,6 +900,20 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                     syncConflictSummary = ""
                 )
             }
+        }
+    }
+
+    suspend fun loadLocomotiveInfo(locomotiveId: Long): Result<LocomotiveServerInfo?> {
+        val locomotive = locomotives.value.firstOrNull { it.id == locomotiveId }
+            ?: return Result.failure(IllegalStateException("Локомотив не найден."))
+        val currentSettings = settings.value
+        return runCatching {
+            container.serverSyncRepository.fetchLocomotiveInfo(
+                serverBaseUrl = currentSettings.syncServerUrl,
+                password = currentSettings.syncPassword,
+                series = locomotive.series,
+                number = locomotive.number,
+            )
         }
     }
 

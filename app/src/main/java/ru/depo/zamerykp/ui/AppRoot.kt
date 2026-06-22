@@ -129,6 +129,7 @@ import androidx.core.content.ContextCompat
 import androidx.compose.foundation.shape.CircleShape
 import kotlinx.coroutines.launch
 import ru.depo.zamerykp.data.db.LocomotiveEntity
+import ru.depo.zamerykp.data.repository.LocomotiveServerInfo
 import ru.depo.zamerykp.R
 import ru.depo.zamerykp.domain.ArchiveItem
 import ru.depo.zamerykp.domain.RepairDateItem
@@ -156,6 +157,9 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+
+private val AppAccentBlue = Color(0xFF276EF1)
+private val AppAccentBlueSoft = Color(0x1A276EF1)
 
 private enum class RootTab(val title: String) {
     LOCOMOTIVES("Локо"),
@@ -353,6 +357,10 @@ private fun LocomotivesScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var detailLocomotiveId by remember { mutableStateOf<Long?>(null) }
     var showKpDialog by remember { mutableStateOf(false) }
+    var showInformationDialog by remember { mutableStateOf(false) }
+    var locomotiveInfo by remember { mutableStateOf<LocomotiveServerInfo?>(null) }
+    var locomotiveInfoLoading by remember { mutableStateOf(false) }
+    var locomotiveInfoError by remember { mutableStateOf<String?>(null) }
     var showLastMeasurementDialog by remember { mutableStateOf(false) }
     var lastMeasurementDto by remember { mutableStateOf<MeasurementExportDto?>(null) }
     val scope = rememberCoroutineScope()
@@ -463,7 +471,7 @@ private fun LocomotivesScreen(
                                     latestArchive != null -> {
                                         when (latestArchive.sentStatus) {
                                             SentStatus.SENT -> Color(0xFF2E7D32)
-                                            SentStatus.EXPORTED -> Color(0xFF1976D2)
+                                            SentStatus.EXPORTED -> AppAccentBlue
                                             SentStatus.NOT_SENT -> Color(0xFFB26A00)
                                         }
                                     }
@@ -527,6 +535,25 @@ private fun LocomotivesScreen(
                         viewModel.selectLocomotive(detailLocomotive.id)
                         openMeasurement()
                     },
+                    onOpenInformation = {
+                        showInformationDialog = true
+                        locomotiveInfo = null
+                        locomotiveInfoError = null
+                        locomotiveInfoLoading = true
+                        scope.launch {
+                            viewModel.loadLocomotiveInfo(detailLocomotive.id)
+                                .onSuccess { info ->
+                                    locomotiveInfo = info
+                                    if (info == null) {
+                                        locomotiveInfoError = "Локомотив не найден в справочнике сервера."
+                                    }
+                                }
+                                .onFailure { error ->
+                                    locomotiveInfoError = error.message ?: "Не удалось загрузить информацию."
+                                }
+                            locomotiveInfoLoading = false
+                        }
+                    },
                     onOpenWheelPairs = { showKpDialog = true },
                     onOpenLastMeasurement = {
                         // Загружаем DTO последнего замера и открываем диалог
@@ -540,18 +567,8 @@ private fun LocomotivesScreen(
                             }
                         }
                     },
-                    onStartMeasurement = {
-                        viewModel.selectLocomotive(detailLocomotive.id)
-                        viewModel.startNewMeasurement()
-                        openMeasurement()
-                    },
-                    onOpenVoiceMeasurement = {
-                        viewModel.selectLocomotive(detailLocomotive.id)
-                        if (measurementState.activeSessionId == null || measurementState.selectedLocomotiveId != detailLocomotive.id) {
-                            viewModel.startNewMeasurement()
-                        }
-                        openMeasurement()
-                    },
+                    onStartMeasurement = { },
+                    onOpenVoiceMeasurement = { },
                     onDelete = { showDeleteDialog = true }
                 )
             }
@@ -621,6 +638,33 @@ private fun LocomotivesScreen(
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Отмена")
+                }
+            }
+        )
+    }
+
+    if (showInformationDialog && detailLocomotive != null) {
+        AlertDialog(
+            onDismissRequest = { showInformationDialog = false },
+            shape = MaterialTheme.shapes.medium,
+            title = { Text("Информация") },
+            text = {
+                when {
+                    locomotiveInfoLoading -> Text("Загрузка со справочника сервера...")
+                    locomotiveInfoError != null -> Text(
+                        locomotiveInfoError.orEmpty(),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Инв. №: ${locomotiveInfo?.inventoryNumber?.ifBlank { "—" } ?: "—"}")
+                        Text("Восьмизначный номер: ${locomotiveInfo?.eightDigitNumber?.ifBlank { "—" } ?: "—"}")
+                        Text("Год постройки: ${locomotiveInfo?.manufactureYear?.ifBlank { "—" } ?: "—"}")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showInformationDialog = false }) {
+                    Text("Закрыть")
                 }
             }
         )
@@ -729,6 +773,7 @@ private fun LocomotiveDetailScreen(
     currentDraftFilledPairs: Int,
     onBack: () -> Unit,
     onResumeDraft: () -> Unit,
+    onOpenInformation: () -> Unit,
     onOpenWheelPairs: () -> Unit,
     onOpenLastMeasurement: (() -> Unit)? = null,
     onStartMeasurement: () -> Unit,
@@ -759,7 +804,7 @@ private fun LocomotiveDetailScreen(
         latestArchive != null -> {
             when (latestArchive.sentStatus) {
                 SentStatus.SENT -> Color(0xFFDFF3E0)
-                SentStatus.EXPORTED -> Color(0xE3E2F2FE)
+                SentStatus.EXPORTED -> AppAccentBlueSoft
                 SentStatus.NOT_SENT -> Color(0xFFFFE8C8)
             }
         }
@@ -770,7 +815,7 @@ private fun LocomotiveDetailScreen(
         latestArchive != null -> {
             when (latestArchive.sentStatus) {
                 SentStatus.SENT -> Color(0xFF2E7D32)
-                SentStatus.EXPORTED -> Color(0xFF1976D2)
+                SentStatus.EXPORTED -> AppAccentBlue
                 SentStatus.NOT_SENT -> Color(0xFFB26A00)
             }
         }
@@ -862,16 +907,18 @@ private fun LocomotiveDetailScreen(
                             .height(42.dp)
                             .background(MaterialTheme.colorScheme.outlineVariant)
                     )
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    OutlinedButton(
+                        modifier = Modifier
+                            .weight(1f)
+                            .align(androidx.compose.ui.Alignment.CenterVertically)
+                            .height(46.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        onClick = onOpenInformation
                     ) {
-                        Icon(Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("Экспорт в базу", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
-                            Text(if (hasActiveDraft) "Да" else "Нет", style = MaterialTheme.typography.titleMedium)
-                        }
+                        Icon(Icons.Default.Info, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Информация", maxLines = 1, softWrap = false)
                     }
                 }
             }
@@ -950,7 +997,7 @@ private fun LocomotiveDetailScreen(
                     modifier = Modifier.weight(1f).height(46.dp),
                     shape = MaterialTheme.shapes.medium,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                    onClick = { latestArchive?.let { viewModel.requestExportShare(it.measurementId) } }
+                    onClick = { }
                 ) {
                     Icon(Icons.Default.Share, contentDescription = null)
                     Spacer(Modifier.width(2.dp))
@@ -2069,7 +2116,7 @@ private fun ArchiveLocomotivesScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = when (latest.sentStatus) {
                                         SentStatus.SENT -> Color(0xFF2E7D32)
-                                        SentStatus.EXPORTED -> Color(0xFF1976D2)
+                                        SentStatus.EXPORTED -> AppAccentBlue
                                         SentStatus.NOT_SENT -> Color(0xFFB26A00)
                                     },
                                     modifier = Modifier.fillMaxWidth(),
@@ -2241,12 +2288,12 @@ private fun ArchiveMeasurementTablesScreen(
                                 colors = CardDefaults.cardColors(
                                     containerColor = when (entry.item.sentStatus) {
                                         SentStatus.SENT -> Color(0xFFDFF3E0)
-                                        SentStatus.EXPORTED -> Color(0xE3E2F2FE)
+                                        SentStatus.EXPORTED -> AppAccentBlueSoft
                                         SentStatus.NOT_SENT -> Color(0xFFFFE8C8)
                                     },
                                     contentColor = when (entry.item.sentStatus) {
                                         SentStatus.SENT -> Color(0xFF2E7D32)
-                                        SentStatus.EXPORTED -> Color(0xFF1976D2)
+                                        SentStatus.EXPORTED -> AppAccentBlue
                                         SentStatus.NOT_SENT -> Color(0xFFB26A00)
                                     }
                                 )
