@@ -74,6 +74,7 @@ data class ReferenceLocomotiveExportDto(
     val series: String,
     val number: String,
     val wheelPairCount: Int,
+    val serviceLife: String = "",
     val sortOrder: Long = 0L,
     val updatedAt: Long = 0L,
     val deletedAt: Long = 0L,

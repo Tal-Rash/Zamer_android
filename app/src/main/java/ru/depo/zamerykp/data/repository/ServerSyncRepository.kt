@@ -283,27 +283,44 @@ class ServerSyncRepository(
             .removeSuffix("/zamer-kp")
 
     private fun login(baseUrl: String, password: String): String {
-        val connection = (URL("$baseUrl/login").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            instanceFollowRedirects = false
-            doOutput = true
-            setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
-            connectTimeout = 15_000
-            readTimeout = 15_000
-        }
-        connection.outputStream.use { output ->
-            OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
-                writer.write("password=${URLEncoder.encode(password, Charsets.UTF_8.name())}")
+        var loginUrl = URL("$baseUrl/login")
+        repeat(4) { _ ->
+            val connection = (loginUrl.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                instanceFollowRedirects = false
+                doOutput = true
+                setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
+                connectTimeout = 15_000
+                readTimeout = 15_000
             }
+            connection.outputStream.use { output ->
+                OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
+                    writer.write("password=${URLEncoder.encode(password, Charsets.UTF_8.name())}")
+                }
+            }
+            val responseCode = connection.responseCode
+            val cookie = connection.headerFields["Set-Cookie"]
+                ?.firstOrNull { it.contains("rtps_session=") || it.contains("grafik_ppr_session=") }
+                ?.substringBefore(';')
+            if (!cookie.isNullOrBlank()) {
+                runCatching { connection.inputStream.close() }
+                connection.disconnect()
+                return cookie
+            }
+            if (responseCode in 300..399) {
+                val location = connection.getHeaderField("Location")
+                    ?: throw IllegalStateException("Сервер вернул редирект без адреса входа (код $responseCode)")
+                runCatching { connection.inputStream.close() }
+                connection.disconnect()
+                loginUrl = URL(loginUrl, location)
+                return@repeat
+            }
+            val error = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            runCatching { connection.inputStream.close() }
+            connection.disconnect()
+            throw IllegalStateException(error.ifBlank { "Не удалось получить веб-сессию (код $responseCode)" })
         }
-        val responseCode = connection.responseCode
-        val cookie = connection.headerFields["Set-Cookie"]
-            ?.firstOrNull { it.contains("grafik_ppr_session=") }
-            ?.substringBefore(';')
-            ?: throw IllegalStateException("Не удалось получить веб-сессию (код $responseCode)")
-        runCatching { connection.inputStream.close() }
-        connection.disconnect()
-        return cookie
+        throw IllegalStateException("Не удалось получить веб-сессию после редиректов")
     }
 
     private suspend fun pullReferenceDto(baseUrl: String, cookie: String): ReferenceDataExportDto {
